@@ -1,0 +1,31 @@
+#!/bin/sh
+
+set -x
+
+#DEBUG=1
+debug() { test x"$DEBUG" = x || logger -tnfswatch -pdebug "$@"; }
+info() { logger -tnfswatch -pinfo "$@"; }
+error() { logger -tnfswatch -perr "$@"; }
+
+E="s,^[ \t]*,,g; /^#/d; /^$/d; /^[^:]\+[ \t]/d"
+MOUNTS="`sed -e "$E" /etc/fstab`"
+debug "found `echo $MOUNTS | wc -l` mounts"
+for HOST in `echo $MOUNTS | cut -d: -f1 | sort -u`; do
+	ping -qc1 "$HOST" >/dev/null && UP=1 || UP=0
+	debug "host '$HOST' : $UP"
+	for DIR in `echo $MOUNTS | awk '{print $2}'`; do
+		awk '{print $2}' /etc/mtab | grep "^${DIR}\$" >/dev/null \
+			&& MNT=1 || MNT=0
+		debug "dir '$DIR' : $MNT"
+		if [ $UP -eq 0 -a $MNT -eq 1 ]; then
+			info "host '$HOST' is down, unmounting '$DIR'"
+			umount -lf "$DIR" || error "could not unmount '$DIR'"
+		elif [ $UP -eq 1 -a $MNT -eq 0 ]; then
+			info "host '$HOST' is up, mounting '$DIR'"
+			mount "$DIR" || error "could not mount '$DIR'"
+		else
+			debug "nothing to do"
+		fi
+	done
+done
+debug "all done!"
