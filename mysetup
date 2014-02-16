@@ -9,7 +9,14 @@ _mkdir()
 	ls -ld "$3"
 }
 
+adduser cedric sudo || true
+adduser cedric staff || true
+adduser cedric src || true
+groups cedric
+
 _mkdir root:staff 2775 /usr/local
+_mkdir root:staff 2775 /usr/local/etc
 _mkdir root:staff 2775 /var/local
 _mkdir root:staff 2775 /var/local/log
+
 echo "mysetup: all done!"
