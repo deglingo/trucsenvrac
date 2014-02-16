@@ -1,0 +1,86 @@
+#!/bin/sh
+
+# system
+PACKAGE='@PACKAGE@'
+CFGDIR="@sysconfdir@"
+CFGFILE="$CFGDIR/myip.conf"
+PKGVARDIR="@pkgvardir@"
+LOGDIR="@logdir@"
+LOGFILE="$LOGDIR/$PACKAGE.log"
+
+# logging
+#DEBUG=1
+LOGOPTS="-t$PACKAGE -s"
+debug() { test x"$DEBUG" = x && echo "$@" || logger $LOGOPTS -pdebug "$@"; }
+info() { logger $LOGOPTS -pinfo "$@"; }
+die() { logger $LOGOPTS -perr "FATAL: $@"; exit 1; }
+
+# _mail STAMP IP LAST_STAMP LAST_IP
+_mail()
+{
+	echo "$1: NEW IP: $2"
+	echo
+	echo "$3: LAST IP: $4"
+}
+
+# redirect all to logfile
+exec >>"$LOGFILE" 2>&1
+debug '######################################################################'
+debug "`date`"
+# get start stamp
+START_STAMP="`date '+%Y-%m-%d'`"
+# parse command line
+FORCE=0
+OPTS="`getopt -n $PACKAGE -o 'f' -- ${@}`" || die "getopt failed"
+eval set -- "$OPTS"
+while true; do
+	case "$1" in
+		-f) FORCE=1; shift;;
+		--) shift; break;;
+		*) die "oups: opt '$1'";;
+	esac
+done
+# read and check the config
+debug "config file: '$CFGFILE'"
+test -e "$CFGFILE" || die "config file not found: '$CFGFILE'"
+. "$CFGFILE" || die "error in config file: '$CFGFILE'"
+test x"${MAILTO:-}" != x || die "MAILTO not set in config"
+: ${HOSTIPADDR:=http://api.hostip.info}
+: ${HOSTIPCMD:=get_html.php}
+: ${TITLE:=`hostname`}
+# get IP
+debug "getting IP from '${HOSTIPADDR}/${HOSTIPCMD}'"
+OUT="`wget -nv -O- ${HOSTIPADDR}/${HOSTIPCMD}`" \
+  || die "wget failed!"
+echo "$OUT" | while read L; do debug " > $L"; done
+# extract it from output
+E="/^[ \t]*IP[ \t]*:/!d;
+   s,^[ \t]*IP[ \t]*:[ \t]*,,g;
+   s,[ \t]*$,,g;"
+IP=`echo "$OUT" | sed -e "$E"`
+test x"$IP" != x || die "got no IP from ${HOSTIPADDR}"
+info "$START_STAMP: got IP from $HOSTIPADDR: '$IP'"
+# send
+for M in $MAILTO; do
+    debug "MAIL: '$M'"
+	# read the cache file and check last vs new
+    CACHE="$PKGVARDIR/myip.$M.cache"
+    test -e "$CACHE" && CINFO="`cat $CACHE`" || CINFO=':'
+    CSTAMP=`echo "$CINFO" | cut -d: -f1`
+    CIP=`echo "$CINFO" | cut -d: -f2`
+    debug "check stamp/ip: '$CSTAMP/$CIP' <> '$START_STAMP/$IP'"
+    if [ $FORCE -eq 0 -a x"$CSTAMP" = x"$START_STAMP" -a x"$CIP" = x"$IP" ]; then
+        info "$M: up to date ($CSTAMP/$CIP)"
+    else
+        info "$M: needs update ($CSTAMP/$CIP) - sending mail"
+		# send mail
+        _mail $START_STAMP $IP $CSTAMP $CIP \
+			| Mail -s "IP UPDATE - $START_STAMP - $TITLE" "$M" \
+			|| { error "Mail '$M' failed ($?)"; continue; }
+		# update cache
+		echo "$START_STAMP:$IP" >"$CACHE.tmp"
+		mv -f "$CACHE.tmp" "$CACHE"
+	fi
+done
+# ok
+debug "all done!"

@@ -1,0 +1,7 @@
+# @PACKAGE@ logs rotation config
+
+compress
+@logdir@/@PACKAGE@.log {
+  daily
+  rotate 7
+}

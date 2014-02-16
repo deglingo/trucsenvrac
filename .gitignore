@@ -1,0 +1,5 @@
+*~
+conf.sed
+/myip/myip
+/myip/cron-myip
+/myip/myip-rotate
