@@ -6,7 +6,7 @@ cronsysconfdir = /etc/cron.d
 
 all: nfswatch cron-nfswatch
 
-%: %.in
+%: %.in conf.sed
 	sed -f conf.sed <$< >$@.tmp
 	mv -f $@.tmp $@
 

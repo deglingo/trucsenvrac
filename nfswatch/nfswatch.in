@@ -1,31 +1,59 @@
 #!/bin/sh
 
-set -x
+# Check all the nfs entries in your fstab and automatically
+# mount/unmount them when the host is up or down.
 
 #DEBUG=1
-debug() { test x"$DEBUG" = x || logger -tnfswatch -pdebug "$@"; }
-info() { logger -tnfswatch -pinfo "$@"; }
-error() { logger -tnfswatch -perr "$@"; }
+log() { local l="$1"; shift; logger -tnfswatch -p"$l" "$@"; }
+debug() { test x"$DEBUG" = x || log debug "DEBUG: $@"; }
+info() { log info "INFO: $@"; }
+error() { log err "ERROR: $@"; }
 
-E="s,^[ \t]*,,g; /^#/d; /^$/d; /^[^:]\+[ \t]/d"
-MOUNTS="`sed -e "$E" /etc/fstab`"
-debug "found `echo $MOUNTS | wc -l` mounts"
-for HOST in `echo $MOUNTS | cut -d: -f1 | sort -u`; do
-	ping -qc1 "$HOST" >/dev/null && UP=1 || UP=0
-	debug "host '$HOST' : $UP"
-	for DIR in `echo $MOUNTS | awk '{print $2}'`; do
-		awk '{print $2}' /etc/mtab | grep "^${DIR}\$" >/dev/null \
-			&& MNT=1 || MNT=0
-		debug "dir '$DIR' : $MNT"
-		if [ $UP -eq 0 -a $MNT -eq 1 ]; then
-			info "host '$HOST' is down, unmounting '$DIR'"
-			umount -lf "$DIR" || error "could not unmount '$DIR'"
-		elif [ $UP -eq 1 -a $MNT -eq 0 ]; then
-			info "host '$HOST' is up, mounting '$DIR'"
-			mount "$DIR" || error "could not mount '$DIR'"
-		else
-			debug "nothing to do"
-		fi
+# get a tmpfile
+FMOUNTS="`mktemp`"
+trap "rm -f $FMOUNTS" EXIT
+# exract nfs* entries from fstab, sorted by hostname so we ping each
+# host only once
+E='^\s*[^#]\S+\s+\S+\s+nfs[1-4]{,1}'   # matches nfs[1234] in 3rd column
+grep -E "$E" /etc/fstab | sort -t: -k1 >"$FMOUNTS"
+debug "found `wc -l $FMOUNTS | awk '{print $1}'` mounts"
+test x"$DEBUG" = x || { while read M; do debug " - $M"; done <"$FMOUNTS"; }
+# and check
+LASTHOST=
+DIDIT=0
+exec <"$FMOUNTS"
+while read ENT; do
+	# extract HOST and ping it
+	HOST=`echo "$ENT" | cut -sd: -f1`
+	test x"$HOST" != x || \
+		{ error "no host found in entry: '$ENT'"; continue; }
+	test x"$HOST" = x"$LASTHOST" || {
+		ERR="`ping -qc1 $HOST 2>&1 >/dev/null`" && UP=1 || UP=0;
+		test x"$ERR" = x || error "ping $HOST: $ERR";
+	    debug "host '$HOST' : $UP"; }
+	LASTHOST="$HOST"
+	# extract DEV and check if it's mounted (mountpoint could do that
+	# but it stalls if host is down and dir is mounted)
+	DEV=`echo "$ENT" | awk '{print $1}'`
+	MNT=0
+	for D in `awk '{print $1}' /etc/mtab`; do
+		test x"$D" != x"$DEV" || { MNT=1; break; }
 	done
+	debug "dev '$DEV' : $MNT"
+	# mount/unmount if needed
+	if [ $UP -eq 0 -a $MNT -eq 1 ]; then
+		DIDIT=1
+		info "host '$HOST' is down, unmounting '$DEV'"
+		ERR="`umount -lf $DEV 2>&1`" \
+			|| error "could not unmount '$DEV' ($ERR)"
+	elif [ $UP -eq 1 -a $MNT -eq 0 ]; then
+		DIDIT=1
+		info "host '$HOST' is up, mounting '$DEV'"
+		ERR="`mount $DEV 2>&1`" || \
+			error "could not mount '$DEV' ($ERR)"
+	else
+		debug "nothing to do"
+	fi
 done
-debug "all done!"
+# only report if we did something
+test $DIDIT -eq 0 && debug "all done!" || info "all done!"
