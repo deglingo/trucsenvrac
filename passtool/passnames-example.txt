@@ -1,0 +1,67 @@
+# Some examples of what you can do with passtool. To try it, run:
+#
+# `passtool -f passnames-example.txt'
+#
+#
+# You will need a wordlist before you can generate passphrases, for
+# this run:
+#
+# `passtool -W [SOURCE...]'
+#
+# Where SOURCEs are plain or gzipped text files (as an example, try
+# /usr/share/dictd/*.dz). The wordlist will be stored in
+# ~/.passtool/wordlist.gz. You can also provide a
+# ~/.passtool/blacklist.txt file to forbid the words you don't want to
+# see.
+#
+
+# A simple identifier
+bob1@example.com
+
+# Get a passphrase instead
+{*}bob2@example.com
+
+# Add some specific options
+{pwcls=up,lw,dg/pwmnc=4/pwmxc=12}bob3a@example.com
+{pwcls=lw,dg}bob3b@example.com
+{pwcls=op}bob3c@example.com # no seriously don't do this :)
+
+# Make some permanent changes...
+{push/*/ppcls=dg}
+bob4a@example.com
+bob4b@example.com
+
+# ... and reset them
+{pop}
+
+# Let's try special forms
+{passphrase}  # =yes
+{!passphrase} # =no
+
+# Make sure two equal idents produce the same password
+bob5@example.com
+bob5@example.com
+{*}bob5@example.com
+{*}bob5@example.com
+
+# ... unless we add some salt
+bob5@example.com/1
+bob5@example.com/2
+{*}bob5@example.com/1
+{*}bob5@example.com/2
+
+# Add a real name
+bob6@example.com//Bob Renard
+
+# Bob Seven's account at SGC
+{pwcls=up,dg/pwmnc=40/pwmxc=40}bob7@example.com//Bob Seven
+
+# Try various passphrase case styles (note that words and seps are not
+# changed by this setting)
+{*/ppcase=cap}bob8@example.com//Bob 8A
+{*/ppcase=up}bob8@example.com//Bob 8B
+{*/ppcase=low}bob8@example.com//Bob 8C
+{*/ppcase=rand}bob8@example.com//Bob 8D
+
+# And now for something completely different
+{pwcls=lw/pwmnc=6/pwmxc=6}bob9@example.com/pepper/Bob Coyote # blah blah...
