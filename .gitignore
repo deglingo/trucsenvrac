@@ -3,3 +3,7 @@ conf.sed
 /myip/myip
 /myip/cron-myip
 /myip/myip-rotate
+/automount/*.rules
+/automount/*.stamp-h
+/automount/automount
+/automount/cron-automount

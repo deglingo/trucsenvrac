@@ -5,23 +5,26 @@ prefix = /usr/local
 sbindir = $(prefix)/sbin
 sysconfdir = $(prefix)/etc
 pkgsysconfdir = $(sysconfdir)/$(PACKAGE)
-logdir = /var/local/log
+vardir = /var/local
+logdir = $(vardir)/log
 udevsysconfdir = /etc/udev/rules.d
+cronsysconfdir = /etc/cron.d
 
 SHELL = /bin/sh
 
 udev_rules = 10_$(PACKAGE).rules
 
-all: $(udev_rules) automount
+.PHONY: all install install-admin install-udev install-cron
 
-%.rules: %.rules.in conf.sed
+all: $(udev_rules) automount.stamp-h cron-$(PACKAGE)
+
+%: %.in conf.sed
 	sed -f conf.sed <$< >$@.tmp
 	mv -f $@.tmp $@
 
-automount: automount.in conf.sed
-	sed -f conf.sed <$< >$@.tmp
-	$(SHELL) $@.tmp -n
-	mv -f $@.tmp $@
+automount.stamp-h: automount
+	$(SHELL) $< -n
+	echo >$@
 
 conf.sed: Makefile
 	(	echo "s,@PACKAGE@,$(PACKAGE),g"; \
@@ -35,6 +38,10 @@ conf.sed: Makefile
 install:
 	test -d "$(sbindir)" || mkdir -p "$(sbindir)"
 	install -m755 automount "$(sbindir)"
+
+install-admin: install-udev install-cron
+
+install-udev:
 	install -m664 $(udev_rules) "$(udevsysconfdir)"
 	if test -x "`which service`"; then \
 		cmd='service udev restart'; \
@@ -49,3 +56,6 @@ install:
 	echo "$$cmd"; \
 	eval "$$cmd" || \
 		{ echo "E: could not restart udev" >&2; exit 1; }
+
+install-cron:
+	install -m644 cron-$(PACKAGE) "$(cronsysconfdir)"

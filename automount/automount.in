@@ -6,12 +6,10 @@ test x"${1:-}" != x"-n" || set -n
 PACKAGE='@PACKAGE@'
 PKGSYSCONFDIR="@pkgsysconfdir@"
 LOGDIR='@logdir@'
+LOGFILE="$LOGDIR/$PACKAGE.log"
 
 #DEBUG=1
 #DEBUGENV=1
-
-#
-LOGFILE="$LOGDIR/$PACKAGE.log"
 
 # trace
 slogserv='user'
@@ -24,6 +22,8 @@ die() { error "FATAL: $@"; exit 1; }
 trace() { test x"${DEBUG:-}" = x && echo "$PACKAGE: $@" >&2 || debug "$@"; }
 
 # these should be redefined in config file
+pre_boot() { info "no pre_boot handler defined"; }
+post_boot() { info "no post_boot handler defined"; }
 pre_add()  { info "no pre_add handler defined"; }
 post_add() { info "no post_add handler defined"; }
 pre_remove()  { info "no pre_remove handler defined"; }
@@ -72,6 +72,27 @@ _mount()
 		return 1
 	fi
 	return 0
+}
+
+# proc_boot
+proc_boot()
+{
+	for CONFIGFILE in "$PKGSYSCONFDIR"/*.conf; do
+		info "boot: '$CONFIGFILE'"
+		( _boot_disk; ) \
+			|| error "boot script failed: '$CONFIGFILE'"
+	done
+}
+
+# _boot_disk
+_boot_disk()
+{
+	export ID_FS_UUID=`basename "$CONFIGFILE" .conf`
+	. "$CONFIGFILE" \
+		|| { error "error in config file: '$CONFIGFILE'"; exit 1; }
+	pre_boot
+	_mount "$MNTDIR"
+	post_boot
 }
 
 # proc_add
@@ -140,7 +161,7 @@ main()
 	# create the logdir and make sure it is writable
 	test -d "$LOGDIR" || mkdir -p "$LOGDIR" \
 		|| error "could not create LOGDIR: '$LOGDIR'"
-	touch "$LOGFILE" || error "LOGDIR is not writable: '$LOGDIR'"
+	touch "$LOGFILE" || error "LOGFILE is not writable: '$LOGFILE'"
 	exec >>"$LOGFILE" 2>&1
 	# hello
 	for I in `seq 1 70`; do echo -n '#'; done; echo
@@ -148,25 +169,28 @@ main()
 	#trace "logfile: '$LOGFILE'"
 	test x"${DEBUGENV:-}" = x \
 		|| env | sort -t= -k1
-	# check and read the config file
-	CONFIGFILE="$PKGSYSCONFDIR/$ID_FS_UUID.conf"
+	# boot
+	test x"$ACTION" != x"boot" || {
+		proc_boot;
+		exit $?; }
 	# make the model name
 	MODEL="$ID_VENDOR $ID_MODEL (`expr ${UDISKS_PARTITION_SIZE:-0} / 1048576`Mb)"
 	info "$ACTION: $MODEL (dev='$DEVNAME', type='$DEVTYPE', fstype='$ID_FS_TYPE', label='$ID_FS_LABEL', uuid='$ID_FS_UUID')"
 	# check if we are concerned by this device
-	IGNORE=1
+	CONFIGFILE="$PKGSYSCONFDIR/$ID_FS_UUID.conf"
 	if [ x"$ACTION" != x"add" -a x"$ACTION" != x"remove" ]; then
-		IGNMSG="action '$ACTION'"
+		info "$DEVNAME ignored: unknown action ($ACTION)"
+		exit 0
 	elif [ x"$DEVTYPE" != x"partition" ]; then
-		IGNMSG="not a partition ($DEVTYPE)"
+		info "$DEVNAME ignored: not a partition ($DEVTYPE)"
+		exit 0
 	elif ! [ -e "$CONFIGFILE" ]; then
-		IGNMSG="not configured ($CONFIGFILE not found)"
-	else
-		. "$CONFIGFILE" \
-			&& IGNORE=0 \
-			|| { error "error in config file: '$CONFIGFILE'"; IGNMSG="error"; }
+		info "$DEVNAME ignored: not configured ($CONFIGFILE not found)"
+		exit 0
 	fi
-	test $IGNORE -eq 0 || { info "$DEVNAME ignored: $IGNMSG"; exit 0; }
+	# read the config file
+	. "$CONFIGFILE" \
+		|| { error "error in config file: '$CONFIGFILE'"; exit 1; }
 	# check config
 	# [FIXME] should create MNTDIR on the fly ?
 	test x"$MNTDIR" != x || die "MNTDIR not set in $CONFIGFILE"
