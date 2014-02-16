@@ -1,0 +1,187 @@
+#!@SHELL@
+# -*- shell-script -*-
+
+test x"${1:-}" != x"-n" || set -n
+
+PACKAGE='@PACKAGE@'
+PKGSYSCONFDIR="@pkgsysconfdir@"
+LOGDIR='@logdir@'
+
+#DEBUG=1
+#DEBUGENV=1
+
+#
+LOGFILE="$LOGDIR/$PACKAGE.log"
+
+# trace
+slogserv='user'
+syslog() { local l="$1"; shift; logger -s -t"$PACKAGE" -p"$slogserv.$l" "$@"; }
+debug() { syslog debug "$@"; }
+info()  { syslog info "$@"; }
+warn()  { syslog warn "$@"; }
+error() { syslog err "$@"; }
+die() { error "FATAL: $@"; exit 1; }
+trace() { test x"${DEBUG:-}" = x && echo "$PACKAGE: $@" >&2 || debug "$@"; }
+
+# these should be redefined in config file
+pre_add()  { info "no pre_add handler defined"; }
+post_add() { info "no post_add handler defined"; }
+pre_remove()  { info "no pre_remove handler defined"; }
+post_remove() { info "no post_remove handler defined"; }
+
+# _ismounted DIR
+_ismounted()
+{
+	local dir1="$1" dir2
+	for dir2 in `awk '{print $2}' /etc/mtab`; do
+		#trace " - '$dir' <> '$dir2'"
+		# [FIXME] -ef does not work (because it's a mount point ?)
+		if test "$dir1" = "$dir2"; then
+			# trace "ismounted($dir) : YES"
+			return 0
+		fi
+	done
+	# trace "ismounted($dir) : NO"
+	return 1
+}
+
+# _umount
+_umount()
+{
+	local dir="$1"
+	info "umount '$dir'"
+	sync
+	if ! umount "$dir"; then
+		error "umount '$dir' failed, trying lazy mode"
+		if ! umount -l "$dir"; then
+			error "could not unmount '$dir'"
+			return 1
+		fi
+	fi
+	return 0
+}
+
+# _mount
+_mount()
+{
+	local dir="$1"
+	info "mount '$dir'"
+	sync
+	if ! mount "$dir"; then
+		error "could not mount '$dir'"
+		return 1
+	fi
+	return 0
+}
+
+# proc_add
+proc_add()
+{
+	local dir
+	pre_add
+	for dir in $MNTDIR; do
+		_add_dir "$dir"
+	done
+	post_add
+}
+
+# _add_dir
+_add_dir()
+{
+	local dir="$1" ok=1
+	#trace "add_dir: '$dir'"
+	while _ismounted "$dir"; do
+		warn "'$dir' is mounted!"
+		_umount "$dir" || { ok=0; break; }
+	done
+	# fsck
+	if [ $ok -ne 0 ]; then
+		local fsck
+		if fsck="`which fsck.$ID_FS_TYPE`" && test -x "$fsck"; then
+			local cmd="$fsck -p $DEVNAME"
+			info "$cmd"
+			eval "$cmd" || die "fsck failed!"
+		else
+			error "not fsck found for '$ID_FS_TYPE'"
+		fi
+	else
+		warn "device seems to be mounted, _not_ running fsck"
+	fi
+	# [fixme] skip if mounted ?
+	_mount "$dir"
+}
+
+# proc_remove
+proc_remove()
+{
+	local dir
+	pre_remove
+	for dir in $MNTDIR; do
+		_remove_dir "$dir"
+	done
+	post_remove
+}
+
+# _remove_dir:
+_remove_dir()
+{
+	local dir="$1"
+	#trace "remove_dir: '$dir'"
+	while _ismounted "$dir"; do
+		_umount "$dir" || return 1
+	done
+	return 0
+}
+ 
+# main
+main()
+{
+	trace "hello"
+	# create the logdir and make sure it is writable
+	test -d "$LOGDIR" || mkdir -p "$LOGDIR" \
+		|| error "could not create LOGDIR: '$LOGDIR'"
+	touch "$LOGFILE" || error "LOGDIR is not writable: '$LOGDIR'"
+	exec >>"$LOGFILE" 2>&1
+	# hello
+	for I in `seq 1 70`; do echo -n '#'; done; echo
+	trace "`date` ($@)"
+	#trace "logfile: '$LOGFILE'"
+	test x"${DEBUGENV:-}" = x \
+		|| env | sort -t= -k1
+	# check and read the config file
+	CONFIGFILE="$PKGSYSCONFDIR/$ID_FS_UUID.conf"
+	# make the model name
+	MODEL="$ID_VENDOR $ID_MODEL (`expr ${UDISKS_PARTITION_SIZE:-0} / 1048576`Mb)"
+	info "$ACTION: $MODEL (dev='$DEVNAME', type='$DEVTYPE', fstype='$ID_FS_TYPE', label='$ID_FS_LABEL', uuid='$ID_FS_UUID')"
+	# check if we are concerned by this device
+	IGNORE=1
+	if [ x"$ACTION" != x"add" -a x"$ACTION" != x"remove" ]; then
+		IGNMSG="action '$ACTION'"
+	elif [ x"$DEVTYPE" != x"partition" ]; then
+		IGNMSG="not a partition ($DEVTYPE)"
+	elif ! [ -e "$CONFIGFILE" ]; then
+		IGNMSG="not configured ($CONFIGFILE not found)"
+	else
+		. "$CONFIGFILE" \
+			&& IGNORE=0 \
+			|| { error "error in config file: '$CONFIGFILE'"; IGNMSG="error"; }
+	fi
+	test $IGNORE -eq 0 || { info "$DEVNAME ignored: $IGNMSG"; exit 0; }
+	# check config
+	# [FIXME] should create MNTDIR on the fly ?
+	test x"$MNTDIR" != x || die "MNTDIR not set in $CONFIGFILE"
+	MNTDIR_="`readlink -e $MNTDIR`" && test -d "$MNTDIR_" \
+		|| die "MNTDIR is not a directory: '$MNTDIR'"
+	MNTDIR="$MNTDIR_"
+	# go
+	case "$ACTION" in
+		add) proc_add;;
+		remove) proc_remove;;
+		*) die "? ACTION='$ACTION'";;
+	esac
+	# ok
+	trace "all done!"
+}
+
+# exec
+main "${@}"
