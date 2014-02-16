@@ -47,7 +47,7 @@ test -e "$CFGFILE" || die "config file not found: '$CFGFILE'"
 test x"${MAILTO:-}" != x || die "MAILTO not set in config"
 : ${HOSTIPADDR:=http://api.hostip.info}
 : ${HOSTIPCMD:=get_html.php}
-: ${TITLE:=`hostname`}
+: ${TITLE:=?}
 # get IP
 debug "getting IP from '${HOSTIPADDR}/${HOSTIPCMD}'"
 OUT="`wget -nv -O- ${HOSTIPADDR}/${HOSTIPCMD}`" \
@@ -74,8 +74,9 @@ for M in $MAILTO; do
     else
         info "$M: needs update ($CSTAMP/$CIP) - sending mail"
 		# send mail
+		SUBJECT="IP UPDATE - $START_STAMP - $TITLE (`hostname -f`)"
         _mail $START_STAMP $IP $CSTAMP $CIP \
-			| Mail -s "IP UPDATE - $START_STAMP - $TITLE" "$M" \
+			| Mail -s "$SUBJECT" "$M" \
 			|| { error "Mail '$M' failed ($?)"; continue; }
 		# update cache
 		echo "$START_STAMP:$IP" >"$CACHE.tmp"
