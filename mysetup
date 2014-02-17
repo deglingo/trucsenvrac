@@ -115,7 +115,7 @@ EOF
 trace "updating aptitude lists..."
 aptitude -q update >/dev/null
 trace "installing packages..."
-aptitude -q --with-recommends -y install $PACKAGES
+aptitude -q --with-recommends install $PACKAGES
 trace "cleaning up packages..."
 /root/aptclean
 
