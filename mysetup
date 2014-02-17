@@ -31,6 +31,14 @@ xchat
 exim4
 mutt
 deborphan
+
+gnome-nettool
+
+grpn
+geogebra
+blender
+gimp gimp-data-extras gimp-dcraw gimp-gutenprint gimp-help-fr gimp-plugin-registry gimp-texturize
+audacity
 '
 
 EXCLUDE_USERS='nobody'
@@ -100,7 +108,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 40 * * * * root rsync -a --delete --delete-excluded /root/ /home/root-
 
 # ubuntu fix: chmod +x all desktop files
-45 * * * * root find /home -mindepth 2 -maxdepth 2 -type d -name 'Bureau' -exec ls -ld
+45 * * * * root find /home -mindepth 2 -maxdepth 2 -type d -name 'Bureau' -exec eval chmod -v +x '{}/*.desktop' ';'
 
 EOF
 
@@ -110,5 +118,80 @@ trace "installing packages..."
 aptitude -q --with-recommends -y install $PACKAGES
 trace "cleaning up packages..."
 /root/aptclean
+
+# exim4 config
+trace "EXIM4 CONFIG"
+echo -n "smtp server (leave blank to skip config): "
+read EXIM_SMTP_SERVER
+if [ x"$EXIM_SMTP_SERVER" = x ]; then
+	trace "exim config skipped"
+else
+	EXIM_SMTP_PORT='587'
+	echo -n "smtp port ($EXIM_SMTP_PORT) : "
+	read LINE
+	test x"$LINE" = x || EXIM_SMTP_PORT="$LINE"
+	EXIM_SMTP_FROM=`echo "$EXIM_SMTP_SERVER" | cut -d. -f2-`
+	echo -n "smtp from ($EXIM_SMTP_FROM) :"
+	read LINE
+	test x"$LINE" = x || EXIM_SMTP_FROM="$LINE"
+	echo -n "extra test addresses: "
+	read EXIM_TEST_ADDRS
+	echo -n "smtp username: "
+	read EXIM_USERNAME
+	# [FIXME] no echo!!
+	echo -n "smtp password: "
+	read EXIM_PASSWORD
+	EXIM_TEST_ADDRS="root@`hostname -f` $ADMINUSER@`hostname -f` $EXIM_TEST_ADDRS"
+	EXIMCONF='/etc/exim4/update-exim4.conf.conf'
+	E="s,^\(dc_eximconfig_configtype\)=.*\$,\1='smarthost',g;
+       s,^\(dc_other_hostnames\)=.*\$,\1='',g;
+       s,^\(dc_local_interfaces\)=.*\$,\1='127.0.0.1 ; ::1',g;
+       s,^\(dc_readhost\)=.*\$,\1='$EXIM_SMTP_FROM',g;
+       s,^\(dc_relay_domains\)=.*\$,\1='',g;
+       s,^\(dc_minimaldns\)=.*\$,\1='false',g;
+       s,^\(dc_relay_nets\)=.*\$,\1='',g;
+       s,^\(dc_smarthost\)=.*\$,\1='$EXIM_SMTP_SERVER::$EXIM_SMTP_PORT',g;
+       s,^\(CFILEMODE\)=.*\$,\1='644',g;
+       s,^\(dc_use_split_config\)=.*\$,\1='true',g;
+       s,^\(dc_hide_mailname\)=.*\$,\1='true',g;
+       s,^\(dc_mailname_in_oh\)=.*\$,\1='true',g;
+       s,^\(dc_localdelivery\)=.*\$,\1='mail_spool',g;"
+	sed -e "$E" <"$EXIMCONF" >"$EXIMCONF.tmp"
+	less "$EXIMCONF.tmp"
+	( diff -u "$EXIMCONF" "$EXIMCONF.tmp"; echo "DIFF: $?"; ) | less
+	trace "exim config summary:"
+	trace "  smtp server: $EXIM_SMTP_SERVER"
+	trace "  smtp port:   $EXIM_SMTP_PORT"
+	trace "  from addr:   $EXIM_SMTP_FROM"
+	trace "  test addrs:  $EXIM_TEST_ADDRS"
+	echo -n "is this correct ? (y/N) "
+	read Y
+	case "$Y" in
+		y|Y|yes|YES)
+			trace "go..."
+			cp -vf --backup=simple "$EXIMCONF" "$EXIMCONF"
+			mv -f "$EXIMCONF.tmp" "$EXIMCONF"
+			:>/etc/exim4/passwd.client.tmp
+			exec </etc/exim4/passwd.client
+			while read LINE; do
+				SRV=`echo "$LINE" | cut -sd: -f1`
+				test x"$SRV" = x"$EXIM_STMP_SERVER" || echo "$LINE" >>/etc/exim4/passwd.client.tmp
+			done
+			echo "$EXIM_SMTP_SERVER:$EXIM_USERNAME:$EXIM_PASSWORD" >>/etc/exim4/passwd.client.tmp
+			mv -f /etc/exim4/passwd.client.tmp /etc/exim4/passwd.client
+			chown root:Debian-exim /etc/exim4/passwd.client
+			chmod 640 /etc/exim4/passwd.client
+			ls -l /etc/exim4/passwd.client
+			dpkg-reconfigure exim4-config
+			for M in $EXIM_TEST_ADDRS; do
+				trace "sending test mail to '$M'"
+				echo "TEST" | Mail -s "EXIM CONFIG TEST - `date` - `hostname -f`" "$M" \
+					|| trace "ERROR: Mail failed ($?)"
+			done
+			;;
+		*)
+			trace "exim config skipped"
+	esac
+fi
 
 echo "mysetup: all done!"
