@@ -1,0 +1,34 @@
+#!/bin/bash
+
+set -eu
+
+trace() { echo "aptclean: $*"; }
+
+while true; do
+	ORPHANS=`deborphan`
+	if [ x"$ORPHANS" = x ]; then
+		trace "no more orphans"
+		break
+	else
+		N_ORPHANS=`echo $ORPHANS | wc -w`
+		trace "$N_ORPHANS orphans:"
+		echo $ORPHANS | fmt -t
+		aptitude remove $ORPHANS
+	fi
+done
+
+PURGES=`dpkg -l | grep ^rc | awk '{print $2}'`
+if [ x"$PURGES" = x ]; then
+	trace "nothing to purge"
+else
+	N_PURGES=`echo $PURGES | wc -w`
+	trace "$N_PURGES packages to purges:"
+	echo $PURGES | fmt -t
+	aptitude purge $PURGES
+fi
+
+trace "cleaning cache..."
+aptitude clean
+
+df -h /
+trace "all done!"

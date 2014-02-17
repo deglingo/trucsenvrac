@@ -1,22 +1,114 @@
 #!/bin/sh
 
+trace() { echo "mysetup: $*" >&2; }
+die() { echo "mysetup:FATAL: $*" >&2; exit 1; }
+
+PROGDIR=`dirname $0`
+PROGDIR=`readlink -e $PROGDIR`
+
+ADMINUSER='cedric'
+ADMINHOME=`getent passwd $ADMINUSER | cut -d: -f6`
+test -d "$ADMINHOME" || die "no admin home: '$ADMINHOME'"
+
+PACKAGES='
+emacs
+emacs-goodies-el
+emacs-intl-fonts
+python-mode
+git
+build-essential
+libtool
+autoconf
+autoconf-archive
+autoconf-doc
+automake
+python3
+python-mode
+notify-osd
+vlc
+gnome-icon-theme gnome-extra-icons gnome-icon-theme-extras
+xchat
+exim4
+mutt
+deborphan
+'
+
+EXCLUDE_USERS='nobody'
+
+# list_users
+list_users()
+{
+	local line u
+	getent passwd | while read line; do
+		local uid=`echo "$line" | cut -d: -f3`
+		test $uid -ge 1000 || continue
+		local name=`echo "$line" | cut -d: -f1`
+		local excl=0
+		for u in $EXCLUDE_USERS; do
+			test x"$u" != x"$name" || { excl=1; break; }
+		done
+		test $excl -ne 0 || echo "$name"
+	done
+}
+
 # _mkdir OWNER MODE DIR
 _mkdir()
 {
-	test -d "$3" || mkdir "$3"
+	test -d "$3" || mkdir -vp "$3"
 	chown "$1" "$3"
 	chmod "$2" "$3"
 	ls -ld "$3"
 }
 
-adduser cedric sudo || true
-adduser cedric staff || true
-adduser cedric src || true
-groups cedric
 
+adduser "$ADMINUSER" sudo || true
+adduser "$ADMINUSER" staff || true
+adduser "$ADMINUSER" src || true
+groups "$ADMINUSER"
+
+_mkdir root:root 700 /home/root-
+_mkdir root:staff 2775 /src
+_mkdir root:staff 2775 /build
 _mkdir root:staff 2775 /usr/local
 _mkdir root:staff 2775 /usr/local/etc
 _mkdir root:staff 2775 /var/local
 _mkdir root:staff 2775 /var/local/log
+
+# admin
+rm -f "$ADMINHOME"/etc
+ln -svf /usr/local/etc "$ADMINHOME"/etc
+cp -vf "$PROGDIR"/aptclean /root
+chmod +x /root/aptclean
+
+# users
+for USER in root `list_users`; do
+	USERHOME=`getent passwd $USER | cut -d: -f6`
+	trace "USER: '$USER' -> '$USERHOME'"
+	rm -f "$USERHOME"/.emacs "$USERHOME"/.bash_profile
+	ln -svf "$PROGDIR/.emacs" "$USERHOME/.emacs"
+	ln -svf "$PROGDIR/.bash_profile" "$USERHOME/.bash_profile"
+done
+
+trace "cron setup"
+cat >/etc/cron.d/cron-cedric-setup <<EOF
+# cron-cedric-setup - installed by mysetup
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# /root backup
+40 * * * * root rsync -a --delete --delete-excluded /root/ /home/root-
+
+# ubuntu fix: chmod +x all desktop files
+45 * * * * root find /home -mindepth 2 -maxdepth 2 -type d -name 'Bureau' -exec ls -ld
+
+EOF
+
+trace "updating aptitude lists..."
+aptitude -q update >/dev/null
+trace "installing packages..."
+aptitude -q --with-recommends -y install $PACKAGES
+trace "cleaning up packages..."
+/root/aptclean
 
 echo "mysetup: all done!"
