@@ -13,13 +13,12 @@ LOGFILE="$LOGDIR/$PACKAGE.log"
 
 # trace
 slogserv='user'
-syslog() { local l="$1"; shift; logger -s -t"$PACKAGE" -p"$slogserv.$l" "$@"; }
-debug() { syslog debug "$@"; }
-info()  { syslog info "$@"; }
-warn()  { syslog warn "$@"; }
-error() { syslog err "$@"; }
-die() { error "FATAL: $@"; exit 1; }
-trace() { test x"${DEBUG:-}" = x && echo "$PACKAGE: $@" >&2 || debug "$@"; }
+syslog() { local l="$1"; shift; logger -s -t"$PACKAGE" -p"$slogserv.$l" "$*"; }
+debug() { test x"${DEBUG:-}" = x && echo "automount: $*" >&2 || syslog debug "$*"; }
+info()  { syslog info "$*"; }
+warn()  { syslog warn "$*"; }
+error() { syslog err "$*"; }
+die() { error "FATAL: $*"; exit 1; }
 
 # these should be redefined in config file
 pre_boot() { info "no pre_boot handler defined"; }
@@ -29,135 +28,120 @@ post_add() { info "no post_add handler defined"; }
 pre_remove()  { info "no pre_remove handler defined"; }
 post_remove() { info "no post_remove handler defined"; }
 
-# _ismounted DIR
-_ismounted()
+# am_ismounted DIR
+am_ismounted()
 {
-	local dir1="$1" dir2
+	local dir1=`readlink -e $1` && test -d "$dir1" \
+		|| { error "am_ismounted: invalid dir: '$1'"; return 1; }
+	local dir2
 	for dir2 in `awk '{print $2}' /etc/mtab`; do
-		#trace " - '$dir' <> '$dir2'"
-		# [FIXME] -ef does not work (because it's a mount point ?)
-		if test "$dir1" = "$dir2"; then
-			# trace "ismounted($dir) : YES"
-			return 0
-		fi
+		dir2=`readlink -e "$dir2"` && test -d "$dir2" \
+			|| continue
+		test "$dir1" != "$dir2" || return 0
 	done
-	# trace "ismounted($dir) : NO"
 	return 1
 }
 
-# _umount
-_umount()
+# am_strip [FILE]
+am_strip()
 {
-	local dir="$1"
-	info "umount '$dir'"
-	sync
-	if ! umount "$dir"; then
-		error "umount '$dir' failed, trying lazy mode"
-		if ! umount -l "$dir"; then
-			error "could not unmount '$dir'"
-			return 1
-		fi
-	fi
-	return 0
+	local e="s,[\t], ,g;
+             s,^[ ]*,,g;
+             s,[ ]*$,,g;
+             s,[ ]\+, ,g;
+             /^$/d;
+             /^#/d;"
+	test x"${1:-}" = x || exec <"$1"
+	sed -e "$e"
 }
 
-# _mount
-_mount()
+# am_mntdir UUID
+am_mntdir()
 {
-	local dir="$1"
-	info "mount '$dir'"
-	sync
-	if ! mount "$dir"; then
-		error "could not mount '$dir'"
-		return 1
-	fi
-	return 0
+	local uuid="$1" ent
+	ent=`am_strip /etc/fstab | grep "^UUID=${1} "` \
+		&& { echo "$ent" | awk '{print $2}'; return 0; } \
+		|| return 1
+}
+
+# am_mount MOUNT-OPTIONS...
+am_mount()
+{
+	info "mount $*"
+	mount "${@}" \
+		|| { error "mount failed ($?)"; return 1; }
+}
+
+# am_umount UMOUNT-OPTIONS
+am_umount()
+{
+	info "umount $*"
+	umount "${@}" \
+		|| { error "umount failed ($?)"; return 1; }
 }
 
 # proc_boot
 proc_boot()
 {
-	for CONFIGFILE in "$PKGSYSCONFDIR"/*.conf; do
+	for CONFIGFILE in "$PKGSYSCONFDIR"/*.conf; do		
 		info "boot: '$CONFIGFILE'"
-		( _boot_disk; ) \
+		( _boot; ) \
 			|| error "boot script failed: '$CONFIGFILE'"
 	done
 }
 
-# _boot_disk
-_boot_disk()
+# _boot
+_boot()
 {
-	export ID_FS_UUID=`basename "$CONFIGFILE" .conf`
+	ID_FS_UUID=`basename "$CONFIGFILE" .conf`
+	AM_MNTDIR=`am_mntdir "$ID_FS_UUID"` \
+		|| { error "could not find '$ID_FS_UUID' in fstab"; return 1; }
+	DEVNAME="`readlink -e /dev/disk/by-uuid/$ID_FS_UUID`" \
+		&& test -e "$DEVNAME" || DEVNAME=
 	. "$CONFIGFILE" \
 		|| { error "error in config file: '$CONFIGFILE'"; exit 1; }
 	pre_boot
-	_mount "$MNTDIR"
+	test x"$DEVNAME" = x || am_mount "$DEVNAME"
 	post_boot
 }
 
 # proc_add
 proc_add()
 {
-	local dir
+	local fsck
+	# pre-mount handler
 	pre_add
-	for dir in $MNTDIR; do
-		_add_dir "$dir"
-	done
-	post_add
-}
-
-# _add_dir
-_add_dir()
-{
-	local dir="$1" ok=1
-	#trace "add_dir: '$dir'"
-	while _ismounted "$dir"; do
-		warn "'$dir' is mounted!"
-		_umount "$dir" || { ok=0; break; }
+	# just in case, try to unmount any ghost left behind
+	while am_ismounted "$AM_MNTDIR"; do
+		am_umount -lf "$AM_MNTDIR" || break
 	done
 	# fsck
-	if [ $ok -ne 0 ]; then
-		local fsck
-		if fsck="`which fsck.$ID_FS_TYPE`" && test -x "$fsck"; then
-			local cmd="$fsck -p $DEVNAME"
-			info "$cmd"
-			eval "$cmd" || die "fsck failed!"
-		else
-			error "not fsck found for '$ID_FS_TYPE'"
-		fi
+	if fsck="`which fsck.$ID_FS_TYPE`" && test -x "$fsck"; then
+		local cmd="$fsck -p $DEVNAME"
+		info "$cmd"
+		eval "$cmd" || die "fsck failed!"
 	else
-		warn "device seems to be mounted, _not_ running fsck"
+		error "not fsck found for '$ID_FS_TYPE'"
 	fi
-	# [fixme] skip if mounted ?
-	_mount "$dir"
+	# mount
+	am_mount "$AM_MNTDIR"
+	# post-mount handler
+	post_add
 }
 
 # proc_remove
 proc_remove()
 {
-	local dir
 	pre_remove
-	for dir in $MNTDIR; do
-		_remove_dir "$dir"
+	while am_ismounted "$AM_MNTDIR"; do
+		am_umount -lf "$AM_MNTDIR" || break
 	done
 	post_remove
-}
-
-# _remove_dir:
-_remove_dir()
-{
-	local dir="$1"
-	#trace "remove_dir: '$dir'"
-	while _ismounted "$dir"; do
-		_umount "$dir" || return 1
-	done
-	return 0
 }
  
 # main
 main()
 {
-	trace "hello"
 	# create the logdir and make sure it is writable
 	test -d "$LOGDIR" || mkdir -p "$LOGDIR" \
 		|| error "could not create LOGDIR: '$LOGDIR'"
@@ -165,8 +149,7 @@ main()
 	exec >>"$LOGFILE" 2>&1
 	# hello
 	for I in `seq 1 70`; do echo -n '#'; done; echo
-	trace "`date` ($@)"
-	#trace "logfile: '$LOGFILE'"
+	debug "`date` ($@)"
 	test x"${DEBUGENV:-}" = x \
 		|| env | sort -t= -k1
 	# boot
@@ -188,15 +171,14 @@ main()
 		info "$DEVNAME ignored: not configured ($CONFIGFILE not found)"
 		exit 0
 	fi
+	# find the mount point
+	AM_MNTDIR_="`am_mntdir $ID_FS_UUID`" \
+		|| { error "could not find UUID '$ID_FS_UUID' in fstab"; return 1; }
+	AM_MNTDIR=`readlink -e "$AM_MNTDIR_"` && test -d "$AM_MNTDIR" \
+		|| { error "mount point is not a directory: '$AM_MNTDIR_'"; return 1; }
 	# read the config file
 	. "$CONFIGFILE" \
 		|| { error "error in config file: '$CONFIGFILE'"; exit 1; }
-	# check config
-	# [FIXME] should create MNTDIR on the fly ?
-	test x"$MNTDIR" != x || die "MNTDIR not set in $CONFIGFILE"
-	MNTDIR_="`readlink -e $MNTDIR`" && test -d "$MNTDIR_" \
-		|| die "MNTDIR is not a directory: '$MNTDIR'"
-	MNTDIR="$MNTDIR_"
 	# go
 	case "$ACTION" in
 		add) proc_add;;
@@ -204,7 +186,7 @@ main()
 		*) die "? ACTION='$ACTION'";;
 	esac
 	# ok
-	trace "all done!"
+	info "all done!"
 }
 
 # exec
