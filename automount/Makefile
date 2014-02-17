@@ -9,14 +9,15 @@ vardir = /var/local
 logdir = $(vardir)/log
 udevsysconfdir = /etc/udev/rules.d
 cronsysconfdir = /etc/cron.d
+logrotatesysconfdir = /etc/logrotate.d
 
 SHELL = /bin/sh
 
 udev_rules = 10_$(PACKAGE).rules
 
-.PHONY: all install install-admin install-udev install-cron
+.PHONY: all install install-admin install-udev install-cron install-logrotate
 
-all: $(udev_rules) automount.stamp-h cron-$(PACKAGE)
+all: $(udev_rules) automount.stamp-h cron-$(PACKAGE) $(PACKAGE).logrotate
 
 %: %.in conf.sed
 	sed -f conf.sed <$< >$@.tmp
@@ -39,7 +40,7 @@ install:
 	test -d "$(sbindir)" || mkdir -p "$(sbindir)"
 	install -m755 automount "$(sbindir)"
 
-install-admin: install-udev install-cron
+install-admin: install-udev install-cron install-logrotate
 
 install-udev:
 	install -m664 $(udev_rules) "$(udevsysconfdir)"
@@ -59,3 +60,6 @@ install-udev:
 
 install-cron:
 	install -m644 cron-$(PACKAGE) "$(cronsysconfdir)"
+
+install-logrotate:
+	install -m644 -T $(PACKAGE).logrotate "$(logrotatesysconfdir)/$(PACKAGE)"

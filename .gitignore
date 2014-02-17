@@ -7,3 +7,4 @@ conf.sed
 /automount/*.stamp-h
 /automount/automount
 /automount/cron-automount
+/automount/automount.logrotate

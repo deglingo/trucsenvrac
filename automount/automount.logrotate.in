@@ -1,0 +1,7 @@
+# automount logs rotation config
+
+compress
+@logdir@/automount.log {
+  daily
+  rotate 7
+}
