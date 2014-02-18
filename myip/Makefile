@@ -7,8 +7,15 @@ sysconfdir = $(prefix)/etc
 vardir = /var/local
 pkgvardir = $(vardir)/$(PACKAGE)
 logdir = $(vardir)/log
+
+# cron
 cronsysconfdir = /etc/cron.d
+CRON_USER = `id -un`
+
+# logrotate
 logrotatesysconfdir = /etc/logrotate.d
+ROTATE_USER = $(CRON_USER)
+ROTATE_GROUP = staff
 
 .PHONY: all install install-admin install-cron install-logrotate
 
@@ -24,6 +31,9 @@ conf.sed: Makefile
 		echo "s,@sysconfdir@,$(sysconfdir),g;"; \
 		echo "s,@pkgvardir@,$(pkgvardir),g;"; \
 		echo "s,@logdir@,$(logdir),g;"; \
+		echo "s,@CRON_USER@,$(CRON_USER),g;"; \
+		echo "s,@ROTATE_USER@,$(ROTATE_USER),g;"; \
+		echo "s,@ROTATE_GROUP@,$(ROTATE_GROUP),g;"; \
 	) >$@.tmp
 	mv -f $@.tmp $@
 
