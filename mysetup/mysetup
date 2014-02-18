@@ -9,6 +9,7 @@ die() { echo "mysetup:FATAL: $*" >&2; }
 # [FIXME] user config
 ADMINUSER='cedric'
 ADMINGROUPS='sudo staff src'
+ADMINHOME="`getent passwd $ADMINUSER | cut -d: -f6`"
 
 # globals
 export LANG=

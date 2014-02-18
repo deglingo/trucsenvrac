@@ -78,10 +78,4 @@ _process_user()
 	ln -s "$DATADIR/.emacs" "$home/.emacs"
 	ln -s "$DATADIR/.bash_profile" "$home/.bash_profile"
 	ls -ldh "$home/.emacs" "$home/.bash_profile"
-	trace "==> ADMIN SETUP"
-	if [ x"$user" = x"$ADMINUSER" ]; then
-		rm "$home/etc"
-		ln -s /usr/local/etc "$home/etc"
-		ls -ldh "$home/etc"
-	fi		
 }

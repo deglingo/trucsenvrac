@@ -1,6 +1,6 @@
 # -*- shell-script -*-
 
-MOD_TITLE='Install admin scripts'
+MOD_TITLE="Admin user setup"
 
 # mod_main
 mod_main()
@@ -16,6 +16,19 @@ mod_main()
 # _main
 _main()
 {
+	trace "admin user: '$ADMINUSER'"
+	for G in $ADMINGROUPS; do
+		adduser "$ADMINUSER" "$G"
+	done
+	groups "$ADMINUSER"
+	# install script
+	cp -f "$DATADIR/aptclean" "/root/aptclean"
+	chmod +x "/root/aptclean"
+	ls -ldh /root/aptclean
+	# admin
+	rm "$ADMINHOME/etc"
+	ln -s /usr/local/etc "$ADMINHOME/etc"
+	ls -ldh "$ADMINHOME/etc"
 	# /root backup
 	trace "installing /root backup in /home/root-"
 	test -d /home/root- || mkdir /home/root
@@ -24,7 +37,14 @@ _main()
 	ls -ldh /home/root-
 	# cron
 	trace "installing admin cron task"
-	cat >"/etc/cron.d/cron-$ADMINUSER-admin" <<EOF
+	_admin_cron >"/etc/cron.d/cron-$ADMINUSER-admin"
+	ls -lh "/etc/cron.d/cron-$ADMINUSER-admin"
+}
+
+# _admin_cron
+_admin_cron()
+{
+	cat <<EOF
 # cron-$ADMINUSER-admin - administration stuff
 
 SHELL=/bin/sh
@@ -36,5 +56,4 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # [TODO] ubuntu fix: chmod +x all desktop files
 #45 * * * * root find /home -mindepth 2 -maxdepth 2 -type d -name 'Bureau' -exec eval chmod -v +x '{}/*.desktop' ';'
 EOF
-	ls -lh /etc/cron.d/cron-$ADMINUSER-admin
 }
