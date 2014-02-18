@@ -9,7 +9,11 @@ vardir = /var/local
 logdir = $(vardir)/log
 udevsysconfdir = /etc/udev/rules.d
 cronsysconfdir = /etc/cron.d
+
+# logrotate
 logrotatesysconfdir = /etc/logrotate.d
+ROTATE_USER = root
+ROTATE_GROUP = staff
 
 SHELL = /bin/sh
 
@@ -33,6 +37,8 @@ conf.sed: Makefile
 		echo "s,@pkgsysconfdir@,$(pkgsysconfdir),g"; \
 		echo "s,@logdir@,$(logdir),g"; \
 		echo "s,@SHELL@,$(SHELL),g"; \
+		echo "s,@ROTATE_USER@,$(ROTATE_USER),g"; \
+		echo "s,@ROTATE_GROUP@,$(ROTATE_GROUP),g"; \
 	) >$@.tmp
 	mv -f $@.tmp $@
 
