@@ -19,6 +19,7 @@ python3
 exim4 mutt
 partimage
 nfs-common nfs-kernel-server
+pastebinit
 EOF
 	# PROG
 	cat >"$MOD_TMPDIR/prog.list" <<EOF
