@@ -1,0 +1,38 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Upgrade packages'
+
+# mod_main
+mod_main()
+{
+	# update
+	:> "$MOD_TMPDIR/install.out"
+	aptitude update 2>&1 \
+		| tee -a "$MOD_TMPDIR/install.out" >&2 & local pid=$!
+	tail -f "$MOD_TMPDIR/install.out" \
+		| dlg "$MOD_TITLE" --cr-wrap --progressbox $DH $DW &
+	R=0; wait $pid || R=$?
+	echo "EXIT STATUS: $R" >>"$MOD_TMPDIR/install.out"
+	# [fixme] test R
+	R=0 dlg "$MOD_TITLE" --cr-wrap --extra-button --extra-label 'Cancel' \
+		--textbox "$MOD_TMPDIR/install.out" $DH $DW || R=$?
+	test $R -eq 0 || return $R
+	# simulation
+	:> "$MOD_TMPDIR/install.out"
+	aptitude --simulate --assume-yes --with-recommends full-upgrade 2>&1 \
+		| tee -a "$MOD_TMPDIR/install.out" >&2 & local pid=$!
+	tail -f "$MOD_TMPDIR/install.out" \
+		| dlg "$MOD_TITLE" --cr-wrap --progressbox $DH $DW &
+	R=0; wait $pid || R=$?
+	echo "EXIT STATUS: $R" >>"$MOD_TMPDIR/install.out"
+	# [fixme] test R
+	R=0 dlg "$MOD_TITLE" --cr-wrap --extra-button --extra-label 'Cancel' \
+		--textbox "$MOD_TMPDIR/install.out" $DH $DW || R=$?
+	test $R -eq 0 || return $R
+	# go
+	reset; clear
+	:> "$MOD_TMPDIR/install.out"
+	aptitude --assume-yes --with-recommends full-upgrade 2>&1 \
+		| tee -a "$MOD_TMPDIR/install.out" >&2
+	dlg "$MOD_TITLE" --cr-wrap --textbox "$MOD_TMPDIR/install.out" $DH $DW
+}

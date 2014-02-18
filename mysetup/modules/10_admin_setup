@@ -1,0 +1,24 @@
+# -*- shell-script -*-
+
+MOD_TITLE="Admin user setup"
+
+# mod_main
+mod_main()
+{
+	:> "$MOD_TMPDIR/main.out"
+	_main 2>&1 | tee -a "$MOD_TMPDIR/main.out" >&2 & local pid=$!
+	tail -f "$MOD_TMPDIR/main.out" \
+		| dlg "$MOD_TITLE" --progressbox $DH $DW & # <"$MOD_TMPDIR/main.out" &
+	local r=0; wait $pid || r=$?
+	dlg "$MOD_TITLE" --textbox "$MOD_TMPDIR/main.out" $DH $DW
+}
+
+# _main
+_main()
+{
+	trace "admin user: '$ADMINUSER'"
+	for G in $ADMINGROUPS; do
+		adduser "$ADMINUSER" "$G"
+	done
+	groups "$ADMINUSER"
+}

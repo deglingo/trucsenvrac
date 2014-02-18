@@ -1,0 +1,132 @@
+#!/bin/sh
+
+set -u
+
+# logging
+trace() { echo "mysetup: $*" >&2; }
+die() { echo "mysetup:FATAL: $*" >&2; }
+
+# [FIXME] user config
+ADMINUSER='cedric'
+ADMINGROUPS='sudo staff src'
+
+# globals
+export LANG=
+BASEDIR=$(readlink -e $(dirname "$0"))
+MODULESDIR="$BASEDIR/modules"
+
+# create a tmpdir
+TMPDIR="`mktemp -d`"
+trap "rm -rf $TMPDIR" EXIT
+DLG_OUT="$TMPDIR/dlg.out"
+
+# list_modules
+list_modules()
+{
+	trace "list modules in '$MODULESDIR'"
+	local n=1 l s
+	find "$MODULESDIR" -mindepth 1 -maxdepth 1 -type f -not -name '*~' -exec basename '{}' ';' \
+		| sort | while read l
+	do
+		local inf="`module_info $l`"
+		echo "$n:$l:$inf"
+		n=$((n+1))
+	done >"$TMPDIR"/modules
+	cat "$TMPDIR"/modules >&2
+}
+
+# module_info
+module_info()
+{
+	local mod="$1"
+	(   . "$MODULESDIR/$mod";
+		echo "$MOD_TITLE";
+	) || die "error in module '$mod'"
+}
+
+# dlg TITLE OPTS
+dlg()
+{
+	local title="$1"; shift
+	local cmd="dialog --no-shadow --title \"MYSETUP: $title\" --output-fd 4"
+	while [ $# -gt 0 ]; do
+		cmd="$cmd \"$1\""
+		shift
+	done
+	trace "> $cmd"
+	rm -f "$DLG_OUT"
+	local r=0
+	eval "$cmd" 4>"$DLG_OUT" || r=$?
+	return $r
+}
+
+# dlg_out
+dlg_out()
+{
+	cat "$DLG_OUT"
+}
+
+# dlg_main DEFAULT-ACTION
+dlg_main()
+{
+	local defo="$1" h=$((NMODULES+1))
+	local cmd="dlg 'MAIN MENU' --default-item $defo --menu 'Action:' 0 0 $h" line
+	exec <"$TMPDIR"/modules
+	while read line; do
+		local tag=`echo "$line" | cut -d: -f1`
+		local title="`echo \"$line\" | cut -d: -f3`"
+		cmd="$cmd $tag \"$title\""
+	done
+	cmd="$cmd Q \"Quit\""
+	eval "$cmd" || return $?
+}
+
+# run_module MODULE
+run_module()
+{
+	trace "running module '$1'"
+	local r=0
+	( _run_module "$1"; ) || r=$?
+	return $r
+}
+
+# _run_module
+_run_module()
+{
+	local mod="$1"
+	MOD_TMPDIR="$TMPDIR/$mod"
+	rm -rf "$MOD_TMPDIR"
+	mkdir "$MOD_TMPDIR"
+	. "$MODULESDIR/$mod"
+	mod_main
+}
+
+# main
+main()
+{
+	trace "basedir: '$BASEDIR'"
+	list_modules
+	NMODULES=`wc -l "$TMPDIR/modules" | awk '{print $1}'`
+	trace "found $NMODULES modules:"
+	( while read l; do trace " > $l"; done <"$TMPDIR"/modules; )
+	# [FIXME]
+	dialog --print-maxsize >&2
+	export DH=24
+	export DW=80
+	# main menu
+	local action=1
+	while true; do
+		local r=0; dlg_main $action || r=$?
+		test $r -eq 0 || break
+		local out="`dlg_out`"
+		test x"$out" != x"Q" || break
+		local line="`grep \"^$out:\" $TMPDIR/modules`" || die "invalid output: '$out'"
+		local mod="`echo \"$line\" | cut -d: -f2`"
+		run_module "$mod" \
+			&& action=$((out+1)) \
+			|| true
+	done
+}
+
+# exec
+main "${@}"

@@ -1,0 +1,117 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Install packages'
+
+# _mklists
+# [FIXME]
+_mklists()
+{
+	# BASE
+	cat >"$MOD_TMPDIR/base.list" <<EOF
+git
+emacs
+emacs-goodies-el
+emacs-intl-fonts
+python-mode
+python3
+exim4
+mutt
+partimage
+deborphan
+EOF
+	# PROG
+	cat >"$MOD_TMPDIR/prog.list" <<EOF
+build-essential
+libtool
+autoconf
+autoconf-archive
+automake
+
+autoconf-doc
+abs-guide
+EOF
+	# XFCE
+	cat >"$MOD_TMPDIR/xfce.list" <<EOF
+gnome-icon-theme gnome-extra-icons gnome-icon-theme-extras
+xchat
+exim4
+vlc
+gnome-nettool
+EOF
+	# AUDIO
+	cat >"$MOD_TMPDIR/audio.list" <<EOF
+audacity
+EOF
+	# GRAPHISM
+	cat >"$MOD_TMPDIR/graphics.list" <<EOF
+blender
+gimp gimp-data-extras gimp-dcraw gimp-gutenprint gimp-help-fr gimp-plugin-registry gimp-texturize
+EOF
+    # MATHS
+	cat >"$MOD_TMPDIR/maths.list" <<EOF
+grpn
+geogebra
+EOF
+	# GAMES
+	cat >"$MOD_TMPDIR/games.list" <<EOF
+gnome-games
+EOF
+}
+
+# mod_main
+mod_main()
+{
+	_mklists
+	# prepare lists
+	find "$MOD_TMPDIR" -mindepth 1 -maxdepth 1 -name '*.list' -exec basename '{}' '.list' ';' | sort >"$MOD_TMPDIR/pkglists"
+	NLISTS="`wc -l $MOD_TMPDIR/pkglists | awk '{print $1}'`"
+	trace "found $NLISTS lists"
+	DLG="dlg \"$MOD_TITLE\" --checklist 'Select lists to install:' 0 0 $NLISTS"
+	N=1
+	exec <"$MOD_TMPDIR/pkglists"
+	while read LINE; do
+		DLG="$DLG $N \"$LINE\" on"
+		N=$((N+1))
+	done
+	# run
+	R=0; eval "$DLG" || R=$?
+	test $R -eq 0 || return $?
+	# make package list
+	PACKAGES=
+	for N in `dlg_out`; do
+		LIST="`head -n $N \"$MOD_TMPDIR/pkglists\" | tail -n 1`"
+		trace "SELECT: '$LIST'"
+		PACKAGES="$PACKAGES `cat $MOD_TMPDIR/$LIST.list`"
+	done
+	PACKAGES="`for P in $PACKAGES; do echo $P; done | sort -u`"
+	PACKAGES="`echo $PACKAGES`"
+	NPACKAGES="`echo $PACKAGES | wc -w`"
+	trace "selected $NPACKAGES packages:"
+	for P in $PACKAGES; do
+		trace " - '$P'"
+	done
+	# simulation
+	aptitude update >&2 # !
+	:> "$MOD_TMPDIR/install.out"
+	aptitude install --simulate --assume-yes --with-recommends $PACKAGES 2>&1 \
+		| tee -a "$MOD_TMPDIR/install.out" >&2 & local pid=$!
+	tail -f "$MOD_TMPDIR/install.out" \
+		| dlg "$MOD_TITLE" --cr-wrap --progressbox $DH $DW &
+	R=0; wait $pid || R=$?
+	echo "EXIT STATUS: $R" >>"$MOD_TMPDIR/install.out"
+	# [fixme] test R
+	R=0 dlg "$MOD_TITLE" --cr-wrap --extra-button --extra-label 'Cancel' \
+		--textbox "$MOD_TMPDIR/install.out" $DH $DW || R=$?
+	test $R -eq 0 || return $R
+	# go
+	reset; clear
+	:> "$MOD_TMPDIR/install.out"
+	aptitude install --assume-yes --with-recommends $PACKAGES 2>&1 \
+		| tee -a "$MOD_TMPDIR/install.out" >&2
+	# tail -f "$MOD_TMPDIR/install.out" \
+	# 	| dlg "$MOD_TITLE" --cr-wrap --progressbox $DH $DW &
+	# R=0; wait $pid || R=$?
+	# echo "EXIT STATUS: $R" >>"$MOD_TMPDIR/install.out"
+	# # [fixme] test R
+	dlg "$MOD_TITLE" --cr-wrap --textbox "$MOD_TMPDIR/install.out" $DH $DW
+}

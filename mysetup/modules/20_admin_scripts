@@ -1,0 +1,40 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Install admin scripts'
+
+# mod_main
+mod_main()
+{
+	:> "$MOD_TMPDIR/main.out"
+	_main 2>&1 | tee -a "$MOD_TMPDIR/main.out" >&2 & local pid=$!
+	tail -f "$MOD_TMPDIR/main.out" \
+		| dlg "$MOD_TITLE" --progressbox $DH $DW & # <"$MOD_TMPDIR/main.out" &
+	local r=0; wait $pid || r=$?
+	dlg "$MOD_TITLE" --textbox "$MOD_TMPDIR/main.out" $DH $DW
+}
+
+# _main
+_main()
+{
+	# /root backup
+	trace "installing /root backup in /home/root-"
+	test -d /home/root- || mkdir /home/root
+	chown root:root /home/root-
+	chmod 700 /home/root-
+	ls -ldh /home/root-
+	# cron
+	trace "installing admin cron task"
+	cat >"/etc/cron.d/cron-$ADMINUSER-admin" <<EOF
+# cron-$ADMINUSER-admin - administration stuff
+
+SHELL=/bin/sh
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+
+# /root backup
+40 * * * * root rsync -a --delete --delete-excluded /root/ /home/root-
+
+# [TODO] ubuntu fix: chmod +x all desktop files
+#45 * * * * root find /home -mindepth 2 -maxdepth 2 -type d -name 'Bureau' -exec eval chmod -v +x '{}/*.desktop' ';'
+EOF
+	ls -lh /etc/cron.d/cron-$ADMINUSER-admin
+}

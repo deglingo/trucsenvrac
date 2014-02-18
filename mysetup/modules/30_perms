@@ -1,0 +1,42 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Fix permissions'
+
+# mod_main
+mod_main()
+{
+	:> "$MOD_TMPDIR/main.out"
+	_main 2>&1 | tee -a "$MOD_TMPDIR/main.out" >&2 & local pid=$!
+	tail -f "$MOD_TMPDIR/main.out" \
+		| dlg "$MOD_TITLE" --progressbox $DH $DW & # <"$MOD_TMPDIR/main.out" &
+	local r=0; wait $pid || r=$?
+	dlg "$MOD_TITLE" --textbox "$MOD_TMPDIR/main.out" $DH $DW
+}
+
+# _main
+_main()
+{
+	_listdirs | while read D; do
+		USER="`echo \"$D\" | cut -d: -f1`"
+		GROUP="`echo \"$D\" | cut -d: -f2`"
+		MODE="`echo \"$D\" | cut -d: -f3`"
+		DIRNAME="`echo \"$D\" | cut -d: -f4-`"
+		test -d "$DIRNAME" || mkdir -p "$DIRNAME"
+		chown "$USER:$GROUP" "$DIRNAME"
+		chmod "$MODE" "$DIRNAME"
+		ls -ldh "$DIRNAME"
+	done
+}
+
+# _listdirs
+_listdirs()
+{
+	# src/build
+	echo "root:staff:2775:/src"
+	echo "root:staff:2775:/build"
+	# staff dirs
+	echo "root:staff:2775:/usr/local"
+	echo "root:staff:2775:/var/local"
+	echo "root:staff:2775:/var/local/log"
+	find /usr/local -mindepth 1 -type d -exec echo "$ADMINUSER:staff:2775:{}" ';'
+}

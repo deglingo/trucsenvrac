@@ -1,0 +1,15 @@
+#!/bin/sh
+
+BASEDIR=$(dirname "$0")
+
+if [ x"${1:-}" = x"--run" ]; then
+	ERRLOG="$2"
+	"$BASEDIR"/mysetup 2>"$ERRLOG"
+else
+	TMPDIR=$(mktemp -d /tmp/mysetup.XXXXXX)
+	trap "rm -rf $TMPDIR" EXIT
+	mkfifo "$TMPDIR/ms.err"
+	cat <"$TMPDIR/ms.err" &
+	rxvt -e "$0" --run "$TMPDIR/ms.err"
+	wait
+fi
