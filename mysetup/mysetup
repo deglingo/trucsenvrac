@@ -114,9 +114,10 @@ main()
 	trace "found $NMODULES modules:"
 	( while read l; do trace " > $l"; done <"$TMPDIR"/modules; )
 	# [FIXME]
-	dialog --print-maxsize >&2
-	export DH=24
-	export DW=80
+	WINSIZE="`dialog --print-maxsize | sed -e 's/[^0-9,]//g'`"
+	export DW="`echo $WINSIZE | cut -d, -f1`"
+	export DH="`echo $WINSIZE | cut -d, -f2`"
+	trace "window size: '${DH}x${DW}'"
 	# main menu
 	local action=1
 	while true; do

@@ -35,34 +35,15 @@ list_users()
 # mod_main
 mod_main()
 {
-	local userlist="`list_users`" user
-	local text="Will configure the following users:\n"
-	for user in $userlist; do
-		text="$text\n - $user"
-	done
-	text="$text\n\nContinue ?"
-	dlg "$MOD_TITLE" --yesno "$text" 0 0 || return $?
-	# go
-	local pipe="$MOD_TMPDIR/users_config.out" line
-	rm -f "$pipe"; mkfifo "$pipe"
-	_main >>"$pipe" 2>&1 &
-	_dupfd <"$pipe" \
-		| dlg "$MOD_TITLE" --programbox "" $DH $DW
-}
-
-_dupfd()
-{
-	local l
-	while read l; do
-		echo "$l"
-		echo "$l" >&2
-	done
+	_main
+	echo -n "All done - press enter"
+	read FOO
 }
 
 # _main
 _main()
 {
-	local user
+	local userlist="`list_users`" user
 	for user in $userlist; do
 		_process_user "$user"
 	done

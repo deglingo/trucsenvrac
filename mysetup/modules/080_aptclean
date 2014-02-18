@@ -7,4 +7,6 @@ mod_main()
 {
 	clear
 	/root/aptclean
+	echo -n "All done - press enter"
+	read FOO
 }
