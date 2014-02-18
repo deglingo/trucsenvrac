@@ -45,6 +45,8 @@ conf.sed: Makefile
 install:
 	test -d "$(sbindir)" || mkdir -p "$(sbindir)"
 	install -m755 automount "$(sbindir)"
+	test -d "$(pkgsysconfdir)" || mkdir -p "$(pkgsysconfdir)"
+	install -m644 example.conf "$(pkgsysconfdir)"
 
 install-admin: install-udev install-cron install-logrotate
 
