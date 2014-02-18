@@ -71,12 +71,14 @@ dlg_main()
 {
 	local defo="$1" h=$((NMODULES+1))
 	local cmd="dlg 'MAIN MENU' --default-item $defo --menu 'Action:' 0 0 $h" line
+	exec 5<&0
 	exec <"$TMPDIR"/modules
 	while read line; do
 		local tag=`echo "$line" | cut -d: -f1`
 		local title="`echo \"$line\" | cut -d: -f3`"
 		cmd="$cmd $tag \"$title\""
 	done
+	exec 0<&5
 	cmd="$cmd Q \"Quit\""
 	eval "$cmd" || return $?
 }

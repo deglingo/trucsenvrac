@@ -17,12 +17,13 @@ mod_main()
 		"user name"    3 1 ""     3 15 30 100 \
 		"test addrs"   4 1 ""     4 15 30 100 \
 		|| return $?
+	exec 5<&0
 	exec <"$DLG_OUT"
 	read SMTP_SERVER
 	read SMTP_PORT
 	read SMTP_USERNAME
 	read SMTP_TESTADDRS
-	cat >&2
+	exec 0<&5
 	# ask ?
 	SMTP_FROM="`echo \"$SMTP_SERVER\" | cut -d. -f2-`"
 	# fix config

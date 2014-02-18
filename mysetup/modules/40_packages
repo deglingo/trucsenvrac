@@ -8,16 +8,17 @@ _mklists()
 {
 	# BASE
 	cat >"$MOD_TMPDIR/base.list" <<EOF
+deborphan
 git
+openssh-client openssh-server
 emacs
 emacs-goodies-el
 emacs-intl-fonts
 python-mode
 python3
-exim4
-mutt
+exim4 mutt
 partimage
-deborphan
+nfs-common nfs-kernel-server
 EOF
 	# PROG
 	cat >"$MOD_TMPDIR/prog.list" <<EOF
@@ -68,11 +69,13 @@ mod_main()
 	trace "found $NLISTS lists"
 	DLG="dlg \"$MOD_TITLE\" --checklist 'Select lists to install:' 0 0 $NLISTS"
 	N=1
+	exec 5<&0
 	exec <"$MOD_TMPDIR/pkglists"
 	while read LINE; do
 		DLG="$DLG $N \"$LINE\" on"
 		N=$((N+1))
 	done
+	exec 0<&5
 	# run
 	R=0; eval "$DLG" || R=$?
 	test $R -eq 0 || return $?
@@ -90,28 +93,10 @@ mod_main()
 	for P in $PACKAGES; do
 		trace " - '$P'"
 	done
-	# simulation
-	aptitude update >&2 # !
-	:> "$MOD_TMPDIR/install.out"
-	aptitude install --simulate --assume-yes --with-recommends $PACKAGES 2>&1 \
-		| tee -a "$MOD_TMPDIR/install.out" >&2 & local pid=$!
-	tail -f "$MOD_TMPDIR/install.out" \
-		| dlg "$MOD_TITLE" --cr-wrap --progressbox $DH $DW &
-	R=0; wait $pid || R=$?
-	echo "EXIT STATUS: $R" >>"$MOD_TMPDIR/install.out"
-	# [fixme] test R
-	R=0 dlg "$MOD_TITLE" --cr-wrap --extra-button --extra-label 'Cancel' \
-		--textbox "$MOD_TMPDIR/install.out" $DH $DW || R=$?
-	test $R -eq 0 || return $R
 	# go
-	reset; clear
-	:> "$MOD_TMPDIR/install.out"
-	aptitude install --assume-yes --with-recommends $PACKAGES 2>&1 \
-		| tee -a "$MOD_TMPDIR/install.out" >&2
-	# tail -f "$MOD_TMPDIR/install.out" \
-	# 	| dlg "$MOD_TITLE" --cr-wrap --progressbox $DH $DW &
-	# R=0; wait $pid || R=$?
-	# echo "EXIT STATUS: $R" >>"$MOD_TMPDIR/install.out"
-	# # [fixme] test R
-	dlg "$MOD_TITLE" --cr-wrap --textbox "$MOD_TMPDIR/install.out" $DH $DW
+	clear
+	aptitude update
+	aptitude keep-all
+	aptitude install --schedule-only --with-recommends $PACKAGES
+	aptitude
 }
