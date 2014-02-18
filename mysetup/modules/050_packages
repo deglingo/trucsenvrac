@@ -34,9 +34,11 @@ abs-guide
 EOF
 	# XFCE
 	cat >"$MOD_TMPDIR/xfce.list" <<EOF
+xfce4 xfce4-goodies
 gnome-icon-theme gnome-extra-icons gnome-icon-theme-extras
 xchat
 exim4
+pavucontrol pavumeter
 vlc
 gnome-nettool
 EOF
@@ -54,9 +56,19 @@ EOF
 grpn
 geogebra
 EOF
+	# TOYS
+	cat >"$MOD_TMPDIR/toys.list" <<EOF
+gnome-games
+EOF
 	# GAMES
 	cat >"$MOD_TMPDIR/games.list" <<EOF
-gnome-games
+hatari
+glob2
+wesnoth
+freeciv-server freeciv-client-gtk freeciv-client-sdl
+freeciv-client-extras freeciv-sound-standard
+freecol
+simutrans simutrans-pak64 simutrans-pak128.britain
 EOF
 }
 
