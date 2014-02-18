@@ -1,0 +1,10 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Aptitude cleanup'
+
+# mod_main
+mod_main()
+{
+	clear
+	/root/aptclean
+}

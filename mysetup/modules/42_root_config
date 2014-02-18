@@ -1,0 +1,31 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Root configuration'
+
+# mod_main
+mod_main()
+{
+	# go
+	local pipe="$MOD_TMPDIR/users_config.out" line
+	rm -f "$pipe"; mkfifo "$pipe"
+	_main >>"$pipe" 2>&1 &
+	_dupfd <"$pipe" \
+		| dlg "$MOD_TITLE" --programbox "" $DH $DW
+}
+
+_dupfd()
+{
+	local l
+	while read l; do
+		echo "$l"
+		echo "$l" >&2
+	done
+}
+
+# _main
+_main()
+{
+	cp -f "$DATADIR/aptclean" "/root/aptclean"
+	chmod +x "/root/aptclean"
+	ls -ldh /root/aptclean
+}

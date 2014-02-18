@@ -1,0 +1,87 @@
+# -*- shell-script -*-
+
+MOD_TITLE='Users configuration'
+
+EXTRA_USERS='root'
+EXCLUDE_USERS='nobody'
+
+# isin
+isin()
+{
+	local i="$1"; shift
+	while [ $# -gt 0 ]; do
+		test x"$i" != x"$1" || return 0
+		shift
+	done
+	return 1
+}
+
+# list_users
+list_users()
+{
+	local line
+	for line in $EXTRA_USERS; do
+		echo $line
+	done
+	getent passwd | while read line; do
+		local uid="`echo \"$line\" | cut -d: -f3`"
+		test $uid -ge 1000 || continue
+		local name="`echo \"$line\" | cut -d: -f1`" name2
+		isin $name $EXCLUDE_USERS && continue || true
+		echo "$name"
+	done
+}
+
+# mod_main
+mod_main()
+{
+	local userlist="`list_users`" user
+	local text="Will configure the following users:\n"
+	for user in $userlist; do
+		text="$text\n - $user"
+	done
+	text="$text\n\nContinue ?"
+	dlg "$MOD_TITLE" --yesno "$text" 0 0 || return $?
+	# go
+	local pipe="$MOD_TMPDIR/users_config.out" line
+	rm -f "$pipe"; mkfifo "$pipe"
+	_main >>"$pipe" 2>&1 &
+	_dupfd <"$pipe" \
+		| dlg "$MOD_TITLE" --programbox "" $DH $DW
+}
+
+_dupfd()
+{
+	local l
+	while read l; do
+		echo "$l"
+		echo "$l" >&2
+	done
+}
+
+# _main
+_main()
+{
+	local user
+	for user in $userlist; do
+		_process_user "$user"
+	done
+}
+
+# _process_user
+_process_user()
+{
+	local user="$1"
+	local home="`getent passwd $user | cut -d: -f6`"
+	trace "==> USER '$user' ($home)"
+	rm -f "$home/.emacs" "$home/.bash_profile"
+	ln -s "$DATADIR/.emacs" "$home/.emacs"
+	ln -s "$DATADIR/.bash_profile" "$home/.bash_profile"
+	ls -ldh "$home/.emacs" "$home/.bash_profile"
+	trace "==> ADMIN SETUP"
+	if [ x"$user" = x"$ADMINUSER" ]; then
+		rm "$home/etc"
+		ln -s /usr/local/etc "$home/etc"
+		ls -ldh "$home/etc"
+	fi		
+}

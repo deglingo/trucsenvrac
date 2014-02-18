@@ -14,6 +14,7 @@ ADMINGROUPS='sudo staff src'
 export LANG=
 BASEDIR=$(readlink -e $(dirname "$0"))
 MODULESDIR="$BASEDIR/modules"
+DATADIR="$BASEDIR/data"
 
 # create a tmpdir
 TMPDIR="`mktemp -d`"
