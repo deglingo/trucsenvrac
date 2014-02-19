@@ -22,9 +22,9 @@ _main()
 	done
 	groups "$ADMINUSER"
 	# install script
-	cp -f "$DATADIR/aptclean" "/root/aptclean"
-	chmod +x "/root/aptclean"
-	ls -ldh /root/aptclean
+	cp -f -t /root "$DATADIR/aptclean" "$DATADIR/fixdesk"
+	chmod +x /root/aptclean /root/fixdesk
+	ls -ldh /root/aptclean /root/fixdesk
 	# admin
 	rm "$ADMINHOME/etc"
 	ln -s /usr/local/etc "$ADMINHOME/etc"
@@ -54,6 +54,6 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 40 * * * * root rsync -a --delete --delete-excluded /root/ /home/root-
 
 # [TODO] ubuntu fix: chmod +x all desktop files
-#45 * * * * root find /home -mindepth 2 -maxdepth 2 -type d -name 'Bureau' -exec eval chmod -v +x '{}/*.desktop' ';'
+45 * * * * root /root/fixdesk
 EOF
 }

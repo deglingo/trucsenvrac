@@ -1,0 +1,12 @@
+#!/bin/sh
+
+EXCLUDE_USERS='nobody'
+
+getent passwd | while read LINE; do
+	UID="`echo \"$LINE\" | cut -d: -f3`"
+	test $UID -ge 1000 || continue
+	USER="`echo \"$LINE\" | cut -d: -f1`"
+	DESKTOP="`su $USER -c 'xdg-user-dir DESKTOP'`"
+	test -d "$DESKTOP" || continue
+	find "$DESKTOP" -mindepth 1 -maxdepth 1 -type f -name '*.desktop' -exec chmod -c +x '{}' ';'
+done 
