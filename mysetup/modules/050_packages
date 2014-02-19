@@ -71,6 +71,8 @@ EOF
 	# TOYS
 	cat >"$MOD_TMPDIR/toys.list" <<EOF
 gnome-games
+gnome-hearts
+eboard eboard-extras-pack1 xboard
 EOF
 	# GAMES
 	cat >"$MOD_TMPDIR/games.list" <<EOF
