@@ -915,16 +915,19 @@ class PassToolApp (object) :
                 error("%s:%d: invalid option(s): '%s'" %
                       (nloc[0], nloc[1], '/'.join('%s=%s' % i for i in opts.items())))
 
-            hident = sha512bits(ident, self.config.sys_salt, self.config.usr_salt, self.config.cmd_salt, salt)
-            rand.seed(hkey ^ hident)
-            
-            if dophrase :
-                pwd = self.gen_pp(rand, wordlist, min_words=min_words, max_words=max_words,
-                                  sep_classes=sep_classes, case_type=case_type)
+            if name == '-' :
+                pwlist.append(('-', ''))
             else :
-                pwd = self.gen_pw(rand, min_chars=min_chars, max_chars=max_chars,
-                                  char_classes=char_classes)
-            pwlist.append((name, pwd))
+                hident = sha512bits(ident, self.config.sys_salt, self.config.usr_salt, self.config.cmd_salt, salt)
+                rand.seed(hkey ^ hident)
+
+                if dophrase :
+                    pwd = self.gen_pp(rand, wordlist, min_words=min_words, max_words=max_words,
+                                      sep_classes=sep_classes, case_type=case_type)
+                else :
+                    pwd = self.gen_pw(rand, min_chars=min_chars, max_chars=max_chars,
+                                      char_classes=char_classes)
+                pwlist.append((name, pwd))
 
 
         # output
@@ -932,8 +935,11 @@ class PassToolApp (object) :
         sep = '+' + ('-' * (cwidth[0]+2)) + '+' + ('-' * (cwidth[1]+2)) + '+'
         print(sep)
         for name, pwd in pwlist :
-            fmt = '| %%-%ds | %%-%ds |' % cwidth
-            print(fmt % (name, pwd))
+            if name == '-' :
+                print(sep)
+            else :
+                fmt = '| %%-%ds | %%-%ds |' % cwidth
+                print(fmt % (name, pwd))
         print(sep)
 
 
