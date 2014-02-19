@@ -19,6 +19,7 @@ python3
 exim4 mutt
 partimage
 nfs-common nfs-kernel-server
+xdg-user-dirs
 pastebinit
 EOF
 	# PROG
@@ -31,6 +32,15 @@ automake
 
 autoconf-doc
 abs-guide
+EOF
+	# X-base
+	cat >"$MOD_TMPDIR/xbase" <<EOF
+xfonts-75dpi xfonts-75dpi-transcoded
+xfonts-100dpi xfonts-100dpi-transcoded
+xfonts-scalable xfonts-mathml
+xfonts-terminus
+xfonts-intl-european xfonts-intl-arabic xfonts-intl chinese xfonts-intl-japanese
+ttf-mscorefonts-installer
 EOF
 	# XFCE
 	cat >"$MOD_TMPDIR/xfce.list" <<EOF
@@ -45,11 +55,13 @@ EOF
 	# AUDIO
 	cat >"$MOD_TMPDIR/audio.list" <<EOF
 audacity
+soundconverter
 EOF
 	# GRAPHISM
 	cat >"$MOD_TMPDIR/graphics.list" <<EOF
 blender
 gimp gimp-data-extras gimp-dcraw gimp-gutenprint gimp-help-fr gimp-plugin-registry gimp-texturize
+pitivi
 EOF
     # MATHS
 	cat >"$MOD_TMPDIR/maths.list" <<EOF
