@@ -21,6 +21,7 @@ partimage
 nfs-common nfs-kernel-server
 xdg-user-dirs
 pastebinit
+ntp
 EOF
 	# PROG
 	cat >"$MOD_TMPDIR/prog.list" <<EOF
