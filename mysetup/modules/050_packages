@@ -22,6 +22,7 @@ nfs-common nfs-kernel-server
 xdg-user-dirs
 pastebinit
 ntp
+amule-daemon
 EOF
 	# PROG
 	cat >"$MOD_TMPDIR/prog.list" <<EOF
@@ -35,13 +36,14 @@ autoconf-doc
 abs-guide
 EOF
 	# X-base
-	cat >"$MOD_TMPDIR/xbase" <<EOF
+	cat >"$MOD_TMPDIR/xbase.list" <<EOF
 xfonts-75dpi xfonts-75dpi-transcoded
 xfonts-100dpi xfonts-100dpi-transcoded
 xfonts-scalable xfonts-mathml
-xfonts-terminus
-xfonts-intl-european xfonts-intl-arabic xfonts-intl chinese xfonts-intl-japanese
+xfonts-terminus xfonts-terminus-oblique
+xfonts-intl-european xfonts-intl-arabic xfonts-intl-chinese xfonts-intl-japanese
 ttf-mscorefonts-installer
+amule amule-gnome-support amule-utils-gui
 EOF
 	# XFCE
 	cat >"$MOD_TMPDIR/xfce.list" <<EOF
@@ -165,5 +167,7 @@ mod_main()
 	aptitude update
 	aptitude keep-all
 	aptitude install --schedule-only --with-recommends $PACKAGES
+	echo -n "press enter..."
+	read FOO
 	aptitude
 }
