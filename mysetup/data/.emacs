@@ -22,6 +22,7 @@
   ;; If you edit it by hand, you could mess it up, so be careful.
   ;; Your init file should contain only one such instance.
   ;; If there is more than one, they won't work right.
+ '(Man-notify-method (quote aggressive))
  '(column-number-mode t)
  '(compilation-ask-about-save nil)
  '(compile-command "gmb ")
@@ -58,7 +59,7 @@
 (require 'midnight)
 
 ;;kill buffers if they were last disabled more than this seconds ago
-(setq clean-buffer-list-delay-special 7200)
+(setq clean-buffer-list-delay-special 3600)
 
 (defvar clean-buffer-list-timer nil
   "Stores clean-buffer-list timer if there is one. You can disable clean-buffer-list by (cancel-timer clean-buffer-list-timer).")
