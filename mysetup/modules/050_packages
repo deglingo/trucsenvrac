@@ -55,6 +55,7 @@ xchat
 pavucontrol pavumeter
 vlc
 gnome-nettool
+xfburn
 EOF
 	# AUDIO
 	cat >"$MOD_TMPDIR/audio.list" <<EOF
