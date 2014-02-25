@@ -1,0 +1,77 @@
+#
+
+MOD_TITLE='Setup SSH'
+
+# mod_main
+mod_main()
+{
+	local e="/^[ \t]*usepam\([ \t]\|$\)/Id"
+	local cfgfile='/etc/ssh/sshd_config'
+	local tmpfile='/etc/ssh/sshd_config.~tmp~'
+	local optfile="$MOD_TMPDIR/sshd_options"
+	local line
+	_list_options >"$optfile"
+	while read line; do
+		_setopt "$optfile" "$line"
+	done <"$cfgfile" >"$tmpfile"
+	# fix missing ones
+	while read line; do
+		local optdone="`echo \"$line\" | cut -d: -f1`"
+		test $optdone -eq 0 || continue
+		local optname="`echo \"$line\" | cut -d: -f2`"
+		local optval="`echo \"$line\" | cut -d: -f3`"
+		trace "++ $optname $optval"
+		echo "# added by mysetup"
+		echo "$optname $optval"
+	done <"$optfile" >>"$tmpfile"
+	# ask
+	local changed=0
+	diff -u "$cfgfile" "$tmpfile" || changed=$?
+	case $changed in
+		0) read -p "nothing changed in '$cfgfile' - press enter..." line; return 0;;
+		1) ;;
+		*) die "diff error ($changed) !!";;
+	esac
+	diff -U `wc -l "$tmpfile" | awk '{print $1}'` "$cfgfile" "$tmpfile" | less
+	read -p "update '$cfgfile' ? (y/N) " line
+	case "$line" in
+		y|Y|yes|YES)
+			mv -bvf "$tmpfile" "$cfgfile"
+			return 0
+			;;
+		*)
+			return 1
+			;;
+	esac
+}
+
+_list_options()
+{
+	sed -e 's,^.*$,0:&,g' <<EOF
+AllowUsers:$ADMINUSER
+PermitRootLogin:no
+PermitEmptyPasswords:no
+PasswordAuthentication:no
+UsePAM:no
+EOF
+}
+
+_setopt()
+{
+	local optfile="$1" cfgline="$2" optline
+	while read optline; do
+		local optdone="`echo \"$optline\" | cut -d: -f1`"
+		local optname="`echo \"$optline\" | cut -d: -f2`"
+		local optval="`echo \"$optline\" | cut -d: -f3`"
+		if echo "$cfgline" | grep -Eqi "^\s*([#]\s*|)${optname}(\s|\$)"; then
+			test $optdone -eq 0 || error "option '$optname' duplicated!"
+			trace "** $optname $optval"
+			echo "$optname $optval"
+			# fix 'optdone'
+			sed -i -e "s,^[01]:\(${optname}:.*$\),1:\1," "$optfile"
+			return 0
+		fi
+	done <"$optfile"
+	trace "-- $cfgline"
+	echo "$cfgline"
+}

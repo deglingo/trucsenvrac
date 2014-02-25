@@ -4,6 +4,7 @@ set -u
 
 # logging
 trace() { echo "mysetup: $*" >&2; }
+error() { echo "mysetup:ERROR: $*" >&2; }
 die() { echo "mysetup:FATAL: $*" >&2; exit 1; }
 
 # [FIXME] user config

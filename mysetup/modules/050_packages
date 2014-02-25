@@ -24,6 +24,7 @@ pastebinit
 ntp
 amule-daemon
 htop
+openssh-client openssh-server fail2ban keychain
 EOF
 	# PROG
 	cat >"$MOD_TMPDIR/prog.list" <<EOF
