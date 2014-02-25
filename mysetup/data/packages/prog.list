@@ -1,0 +1,8 @@
+build-essential
+libtool
+autoconf
+autoconf-archive
+automake
+
+autoconf-doc
+abs-guide

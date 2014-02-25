@@ -1,0 +1,17 @@
+deborphan
+git
+openssh-client openssh-server
+emacs
+emacs-goodies-el
+emacs-intl-fonts
+python-mode
+python3
+exim4 mutt
+partimage
+nfs-common nfs-kernel-server
+xdg-user-dirs
+pastebinit
+ntp
+amule-daemon
+htop
+openssh-client openssh-server fail2ban keychain
