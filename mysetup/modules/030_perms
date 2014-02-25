@@ -36,6 +36,8 @@ _listdirs()
 	echo "root:staff:2775:/build"
 	# staff dirs
 	echo "root:staff:2775:/usr/local"
+	echo "root:staff:2775:/usr/local/etc"
+	echo "root:staff:2775:/usr/local/etc/logrotate.d"
 	echo "root:staff:2775:/var/local"
 	echo "root:staff:2775:/var/local/log"
 	find /usr/local -mindepth 1 -type d -exec echo "$ADMINUSER:staff:2775:{}" ';'

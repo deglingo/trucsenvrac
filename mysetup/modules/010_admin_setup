@@ -2,19 +2,53 @@
 
 MOD_TITLE="Admin user setup"
 
-# mod_main
-mod_main()
+# install_section NAME FILE
+install_section()
 {
-	:> "$MOD_TMPDIR/main.out"
-	_main 2>&1 | tee -a "$MOD_TMPDIR/main.out" >&2 & local pid=$!
-	tail -f "$MOD_TMPDIR/main.out" \
-		| dlg "$MOD_TITLE" --progressbox $DH $DW & # <"$MOD_TMPDIR/main.out" &
-	local r=0; wait $pid || r=$?
-	dlg "$MOD_TITLE" --textbox "$MOD_TMPDIR/main.out" $DH $DW
+	local name="$1" file="$2" tmpfile="$2.~tmp~"; shift 2
+	local re_start="^## BEGIN: MYSETUP_${name}\$"
+	local re_end="^## END: MYSETUP_${name}\$"
+	local state=0 line
+	local content="`while [ $# -gt 0 ]; do echo "$1"; shift; done`"
+	exec 5<&0
+	exec <"$file"
+	while read line; do
+		if echo "$line" | grep -qE "$re_start"; then
+			test $state -eq 0 || die "install_section: duplicate start mark found"
+			state=1
+			echo "## BEGIN: MYSETUP_${name}"
+			echo "$content"
+			echo "## END: MYSETUP_${name}"
+		elif echo "$line" | grep -qE "$re_end"; then
+			test $state -eq 1 || die "install_section: end mark found without start"
+			state=2
+		elif [ $state -eq 0 -o $state -eq 2 ]; then
+			echo "$line"
+		fi
+	done >"$tmpfile"
+	exec 0<&5
+	case $state in
+		0)  # section not found
+			( 	echo "## BEGIN: MYSETUP_${name}"
+				echo "$content"
+				echo "## END: MYSETUP_${name}"
+			) >>"$tmpfile"
+			;;
+		1) die "end section missing";;
+		2) true;; # ok
+		*) die "install_section: oups: state=$state";;
+	esac
+	less "$tmpfile"
+	echo -n "replace '$file' ? (y/N) "
+	read line
+	case "$line" in
+		y|Y) mv -vf "$tmpfile" "$file";;
+		*) rm -vf "$tmpfile";;
+	esac
 }
 
-# _main
-_main()
+# mod_main
+mod_main()
 {
 	trace "admin user: '$ADMINUSER'"
 	for G in $ADMINGROUPS; do
@@ -39,6 +73,12 @@ _main()
 	trace "installing admin cron task"
 	_admin_cron >"/etc/cron.d/cron-$ADMINUSER-admin"
 	ls -lh "/etc/cron.d/cron-$ADMINUSER-admin"
+	# logrotate
+	install_section 'LOGROTATE_USRLOCAL' /etc/logrotate.conf \
+		"include /usr/local/etc/logrotate.d"
+	#
+	echo -n "press enter..."
+	read FOO
 }
 
 # _admin_cron

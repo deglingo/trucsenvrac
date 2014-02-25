@@ -23,6 +23,7 @@ xdg-user-dirs
 pastebinit
 ntp
 amule-daemon
+htop
 EOF
 	# PROG
 	cat >"$MOD_TMPDIR/prog.list" <<EOF
@@ -50,7 +51,6 @@ EOF
 xfce4 xfce4-goodies
 gnome-icon-theme gnome-extra-icons gnome-icon-theme-extras
 xchat
-exim4
 pavucontrol pavumeter
 vlc
 gnome-nettool
@@ -63,6 +63,7 @@ libsox-fmt-all
 EOF
 	# GRAPHISM
 	cat >"$MOD_TMPDIR/graphics.list" <<EOF
+inkscape
 blender
 gimp gimp-data-extras gimp-dcraw gimp-gutenprint gimp-help-fr gimp-plugin-registry gimp-texturize
 pitivi
