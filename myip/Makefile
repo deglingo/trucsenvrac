@@ -11,9 +11,10 @@ logdir = $(vardir)/log
 # cron
 cronsysconfdir = /etc/cron.d
 CRON_USER = `id -un`
+CRON_RULE = '*/5 * * * *'
 
 # logrotate
-logrotatesysconfdir = /etc/logrotate.d
+logrotatesysconfdir = $(sysconfdir)/logrotate.d
 ROTATE_USER = $(CRON_USER)
 ROTATE_GROUP = staff
 
@@ -26,12 +27,16 @@ all: $(PACKAGE) cron-$(PACKAGE) $(PACKAGE)-rotate
 	mv -f $@.tmp $@
 
 conf.sed: Makefile
+	test `id -u` -ne 0 || { \
+		echo "E: won't update conf.sed as root - run make as non-root user first" >&2; \
+		exit 1; }
 	(	echo "s,@PACKAGE@,$(PACKAGE),g;"; \
 		echo "s,@bindir@,$(bindir),g;"; \
 		echo "s,@sysconfdir@,$(sysconfdir),g;"; \
 		echo "s,@pkgvardir@,$(pkgvardir),g;"; \
 		echo "s,@logdir@,$(logdir),g;"; \
 		echo "s,@CRON_USER@,$(CRON_USER),g;"; \
+		echo "s,@CRON_RULE@,`echo $(CRON_RULE)`,g;"; \
 		echo "s,@ROTATE_USER@,$(ROTATE_USER),g;"; \
 		echo "s,@ROTATE_GROUP@,$(ROTATE_GROUP),g;"; \
 	) >$@.tmp
@@ -42,11 +47,9 @@ install: all
 	test -d "$(pkgvardir)" || mkdir -m2775 -p "$(pkgvardir)"
 	test -d "$(logdir)" || mkdir -m2775 -p "$(logdir)"
 	install -m755 $(PACKAGE) "$(bindir)"
+	install -m644 -T $(PACKAGE)-rotate "$(logrotatesysconfdir)/$(PACKAGE)"
 
-install-admin: install-cron install-logrotate
+install-admin: install-cron
 
 install-cron:
 	install -m644 cron-$(PACKAGE) "$(cronsysconfdir)"
-
-install-logrotate:
-	install -m644 -T $(PACKAGE)-rotate "$(logrotatesysconfdir)/$(PACKAGE)"
