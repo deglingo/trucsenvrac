@@ -5,7 +5,6 @@ MOD_TITLE='Install packages'
 # mod_main
 mod_main()
 {
-	_mklists
 	# prepare lists
 	find "$DATADIR/packages" -mindepth 1 -maxdepth 1 -name '*.list' \
 		-exec basename '{}' '.list' ';' \
@@ -29,7 +28,7 @@ mod_main()
 	for N in `dlg_out`; do
 		LIST="`head -n $N \"$MOD_TMPDIR/pkglists\" | tail -n 1`"
 		trace "SELECT: '$LIST'"
-		PACKAGES="$PACKAGES `cat $MOD_TMPDIR/$LIST.list`"
+		PACKAGES="$PACKAGES `cat $DATADIR/packages/$LIST.list`"
 	done
 	PACKAGES="`for P in $PACKAGES; do echo $P; done | sort -u`"
 	PACKAGES="`echo $PACKAGES`"
