@@ -71,8 +71,8 @@ mod_main()
 	ls -ldh /home/root-
 	# cron
 	trace "installing admin cron task"
-	_admin_cron >"/etc/cron.d/cron-$ADMINUSER-admin"
-	ls -lh "/etc/cron.d/cron-$ADMINUSER-admin"
+	_admin_cron >"/etc/cron.d/cron-mysetup-$ADMINUSER"
+	ls -lh "/etc/cron.d/cron-mysetup-$ADMINUSER"
 	# logrotate
 	install_section 'LOGROTATE_USRLOCAL' /etc/logrotate.conf \
 		"include /usr/local/etc/logrotate.d"
@@ -93,7 +93,10 @@ PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 # /root backup
 40 * * * * root rsync -a --delete --delete-excluded /root/ /home/root-
 
-# [TODO] ubuntu fix: chmod +x all desktop files
+# ubuntu fix: chmod +x all desktop files
 45 * * * * root /root/fixdesk
+
+# [fixme]
+25 * * * * cedric cd /home/cedric/Mail/trash/cur 2>/dev/null && find -type f -mtime 7 -print0 | xargs -r0 ls -lh
 EOF
 }
