@@ -11,7 +11,7 @@ udevsysconfdir = /etc/udev/rules.d
 cronsysconfdir = /etc/cron.d
 
 # logrotate
-logrotatesysconfdir = /etc/logrotate.d
+logrotatesysconfdir = $(prefix)/etc/logrotate.d
 ROTATE_USER = root
 ROTATE_GROUP = staff
 
@@ -19,7 +19,7 @@ SHELL = /bin/sh
 
 udev_rules = 10_$(PACKAGE).rules
 
-.PHONY: all install install-admin install-udev install-cron install-logrotate
+.PHONY: all install install-admin install-udev install-cron
 
 all: $(udev_rules) automount.stamp-h cron-$(PACKAGE) $(PACKAGE).logrotate
 
@@ -47,8 +47,9 @@ install:
 	install -m755 automount "$(sbindir)"
 	test -d "$(pkgsysconfdir)" || mkdir -p "$(pkgsysconfdir)"
 	install -m644 example.conf "$(pkgsysconfdir)"
+	install -m644 -T $(PACKAGE).logrotate "$(logrotatesysconfdir)/$(PACKAGE)"
 
-install-admin: install-udev install-cron install-logrotate
+install-admin: install-udev install-cron
 
 install-udev:
 	install -m664 $(udev_rules) "$(udevsysconfdir)"
@@ -68,6 +69,3 @@ install-udev:
 
 install-cron:
 	install -m644 cron-$(PACKAGE) "$(cronsysconfdir)"
-
-install-logrotate:
-	install -m644 -T $(PACKAGE).logrotate "$(logrotatesysconfdir)/$(PACKAGE)"
