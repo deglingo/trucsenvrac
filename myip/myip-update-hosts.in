@@ -1,0 +1,181 @@
+#!/bin/sh
+
+set -u
+
+# system config
+PKGVARDIR='@pkgvardir@'
+LOCKFILE="$PKGVARDIR/myip-update-hosts.lock"
+LOGDIR='@logdir@'
+LOGFILE="$LOGDIR/myip-update-hosts.log"
+
+# logging
+debug() { echo "myip-update-hosts:DEBUG: $*" >&2; }
+error() { echo "myip-update-hosts:ERROR: $*" >&2; }
+die()   { echo "myip-update-hosts:FATAL: $*" >&2; exit 1; }
+
+# isin ITEM SEQ...
+isin()
+{
+	local i="$1"; shift
+	while [ $# -gt 0 ]; do
+		test x"$i" != x"$1" || return 0
+		shift
+	done
+	return 1
+}
+
+# main
+main()
+{
+	# redirect everything to logfile
+	exec >>"$LOGFILE" 2>&1
+	debug '----------------------------------------------------------------------'
+	debug "`date`"
+	debug "$0 $*"
+	parse_mail
+	debug "DATE: '$DATE'"
+	debug "NAME: '$NAME'"
+	debug "IP:   '$IP'"
+	debug "all done!"
+	local r=0
+	fix_hosts </etc/hosts >/etc/hosts.tmp \
+		|| r=$?
+	debug "HOSTS:"
+	while read LINE; do debug "> $LINE"; done </etc/hosts.tmp
+	test $r -eq 0 || die "fix_hosts failed!"
+	chmod 644 /etc/hosts.tmp
+	mv -vf /etc/hosts.tmp /etc/hosts
+}
+
+# parse_mail
+parse_mail()
+{
+	DATE=
+	NAME=
+	IP=
+	# skip the header
+	while read LINE; do
+		test x"$LINE" != x || break
+		#debug "H $LINE"
+	done
+	# parse the body
+	while read LINE; do
+		KEY="`echo \"$LINE\" | cut -sd: -f1`"
+		VAL="`echo \"$LINE\" | cut -sd: -f2-`"
+		KEY="`echo $KEY`" # strip
+		VAL="`echo $VAL`"
+		case "$KEY" in
+			DATE) DATE="$VAL";;
+			NAME) NAME="$VAL";;
+			IP) IP="$VAL";;
+			HOSTNAME) HOSTNAME="$HOSTNAME";;
+			'') ;; # ignore blank lines
+			*) error "invalid field: '$KEY' = '$VAL'";;
+		esac
+	done
+	test x"$DATE" != x || die "DATE is missing"
+	test x"$NAME" != x || die "NAME is missing"
+	test x"$IP" != x || die "IP is missing"
+}
+
+# match_bang LINE
+match_bang()
+{
+	local line="$1"
+	echo "$line" | grep -Eq '^#!myip-update-hosts:' \
+		|| return 1
+	H_BANG="`echo \"$line\" | cut -sd: -f2`"
+	if [ x"$H_BANG" = x"$NAME" ]; then
+		H_DATE="`echo \"$line\" | cut -sd: -f3-`"
+		return 0
+	else
+		H_BANG=
+		return 1
+	fi
+}
+
+# match_host LINE
+match_host()
+{
+	local line="$1"
+	# skip comments and blank lines
+	echo "$line" | grep -Eqv '^\s*\([#]\|$\)' || continue
+	# sanitize line to make it more 'cut friendly'
+	line="`echo \"$line\" | sed -e 's,^[ \t]*,,g; s,[ \t]*$,,g; s,[ \t]\+,\t,g;'`"
+	H_IP="`echo \"$line\" | cut -sf1`"
+	H_HOSTLIST="`echo \"$line\" | cut -sf2-`"
+	if isin "$NAME" $H_HOSTLIST; then
+		return 0
+	else
+		H_IP=
+		H_HOSTLIST=
+		return 1
+	fi
+}
+
+# date_nt DATE1 DATE2
+# (true if DATE1 is newer than DATE2)
+date_nt()
+{
+	local s1 s2
+	s1="`date -d \"$1\" '+%s'`" || die "invalid date: '$1'"
+	s2="`date -d \"$2\" '+%s'`" || die "invalid date: '$2'"
+	test $s1 -gt $s2 && return 0 || return 1
+}
+
+# fix_hosts
+fix_hosts()
+{
+	local line line_orig found=0
+	H_BANG=
+	H_DATE=
+	debug "FIX HOSTS"
+	while read line_orig; do
+		if match_host "$line_orig"; then
+			# [fixme] should this be fatal ?
+			test $found -eq 0 || error "host found multiple times!"
+			found=1
+			if [ x"$H_BANG" = x ]; then
+				error "host found without a bang!"
+				H_STAMP=0
+			elif date_nt "$DATE" "$H_DATE"; then
+				debug "host found (with older date -> update)"
+				H_DATE="$DATE"
+				H_IP="$IP"
+			else
+				debug "host found (with newer date -> ignore)"
+			fi
+			echo "#!myip-update-hosts:${NAME}:${H_DATE}"
+			echo "$H_IP $H_HOSTLIST"
+			H_BANG=
+		else
+			# check for spurious bangs
+			test x"$H_BANG" = x || {
+				error "bang found without a host entry: '$H_BANG - $H_DATE' (stripped)";
+				H_BANG= ; }
+			# is this one a bang ?
+			if match_bang "$line_orig"; then
+				debug "bang found: name='$H_BANG' date='$H_DATE'"
+			else
+				echo "$line_orig"
+			fi
+		fi
+	done
+	# check (again) for spurious bangs
+	test x"$H_BANG" = x || {
+		error "bang found without a host entry: '$H_BANG - $H_DATE' (stripped)";
+		H_BANG= ; }
+	# if nothing found, create the entry
+	if [ $found -eq 0 ]; then
+		debug "host not found, creating entry"
+		echo "#!myip-update-hosts:${NAME}:${DATE}"
+		echo "$IP $NAME"
+	fi
+}
+
+# run
+RMAIN=0
+(   flock -n 9 || die "flock failed ($?)";
+	main;
+) 9>>"$LOCKFILE" || RMAIN=$?
+exit $RMAIN

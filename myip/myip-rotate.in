@@ -1,7 +1,14 @@
 # @PACKAGE@ logs rotation config
 
 compress
+
 @logdir@/@PACKAGE@.log {
+  daily
+  rotate 7
+  su @ROTATE_USER@ @ROTATE_GROUP@
+}
+
+@logdir@/myip-update-hosts.log {
   daily
   rotate 7
   su @ROTATE_USER@ @ROTATE_GROUP@

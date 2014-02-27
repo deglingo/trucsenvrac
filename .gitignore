@@ -1,6 +1,7 @@
 *~
 conf.sed
 /myip/myip
+/myip/myip-update-hosts
 /myip/cron-myip
 /myip/myip-rotate
 /automount/*.rules

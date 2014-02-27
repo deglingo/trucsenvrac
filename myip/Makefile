@@ -20,7 +20,7 @@ ROTATE_GROUP = staff
 
 .PHONY: all install install-admin install-cron install-logrotate
 
-all: $(PACKAGE) cron-$(PACKAGE) $(PACKAGE)-rotate
+all: $(PACKAGE) myip-update-hosts cron-$(PACKAGE) $(PACKAGE)-rotate
 
 %: %.in conf.sed
 	sed -f conf.sed <$< >$@.tmp
@@ -47,6 +47,7 @@ install: all
 	test -d "$(pkgvardir)" || mkdir -m2775 -p "$(pkgvardir)"
 	test -d "$(logdir)" || mkdir -m2775 -p "$(logdir)"
 	install -m755 $(PACKAGE) "$(bindir)"
+	install -m755 myip-update-hosts "$(bindir)"
 	install -m644 -T $(PACKAGE)-rotate "$(logrotatesysconfdir)/$(PACKAGE)"
 
 install-admin: install-cron
