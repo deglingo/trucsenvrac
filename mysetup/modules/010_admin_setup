@@ -63,12 +63,6 @@ mod_main()
 	rm "$ADMINHOME/etc"
 	ln -s /usr/local/etc "$ADMINHOME/etc"
 	ls -ldh "$ADMINHOME/etc"
-	# /root backup
-	trace "installing /root backup in /home/root-"
-	test -d /home/root- || mkdir /home/root
-	chown root:root /home/root-
-	chmod 700 /home/root-
-	ls -ldh /home/root-
 	# cron
 	trace "installing admin cron task"
 	_admin_cron >"/etc/cron.d/cron-mysetup-$ADMINUSER"
@@ -89,9 +83,6 @@ _admin_cron()
 
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-
-# /root backup
-40 * * * * root rsync -a --delete --delete-excluded /root/ /home/root-
 
 # ubuntu fix: chmod +x all desktop files
 45 * * * * root /root/fixdesk
