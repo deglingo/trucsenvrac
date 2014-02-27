@@ -27,12 +27,26 @@ isin()
 # main
 main()
 {
-	# redirect everything to logfile
-	exec >>"$LOGFILE" 2>&1
-	debug '----------------------------------------------------------------------'
-	debug "`date`"
+	# first dump the mail as-is, saving the content
+	CONTENT="`mktemp`"
+	trap "rm -f $CONTENT" EXIT
+	tee "$CONTENT"
+	# redirect everything to mail output
+	exec 2>&1
+	debug "----  myip-update-hosts processing  ----"
+	# run
+	( real_main; ) \
+		&& debug "----  myip-update-hosts: OK  ----" \
+		|| error "----  myip-update-hosts: ERROR  ----"
+	return 0
+}
+
+# real_main
+real_main()
+{
 	debug "$0 $*"
-	parse_mail
+	debug "`date`"
+	parse_mail <"$CONTENT" || die "parse_mail failed"
 	debug "DATE: '$DATE'"
 	debug "NAME: '$NAME'"
 	debug "IP:   '$IP'"
@@ -174,8 +188,6 @@ fix_hosts()
 }
 
 # run
-RMAIN=0
 (   flock -n 9 || die "flock failed ($?)";
 	main;
-) 9>>"$LOCKFILE" || RMAIN=$?
-exit $RMAIN
+) 9>>"$LOCKFILE"
