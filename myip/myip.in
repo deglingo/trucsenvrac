@@ -5,83 +5,102 @@ PACKAGE='@PACKAGE@'
 CFGDIR="@sysconfdir@"
 CFGFILE="$CFGDIR/myip.conf"
 PKGVARDIR="@pkgvardir@"
+LOCKFILE="$PKGVARDIR/myip.lock"
+STATEFILE="$PKGVARDIR/myip.state"
 LOGDIR="@logdir@"
 LOGFILE="$LOGDIR/$PACKAGE.log"
 
 # logging
-#DEBUG=1
-LOGOPTS="-t$PACKAGE -s"
-debug() { test x"$DEBUG" = x && echo "$@" || logger $LOGOPTS -pdebug "$@"; }
-info() { logger $LOGOPTS -pinfo "$@"; }
-die() { logger $LOGOPTS -perr "FATAL: $@"; exit 1; }
+debug() { echo "myip:DEBUG: $*" | tee -a "$LOGFILE" >&$DEBUGFD; }
+die()   { echo "myip:ERROR: $*" | tee -a "$LOGFILE" >&$ERRORFD; exit 1; }
 
-# _mail STAMP IP LAST_STAMP LAST_IP
-_mail()
+# mail_body
+mail_body()
 {
-	echo "$1: NEW IP: $2"
-	echo
-	echo "$3: LAST IP: $4"
+	echo "HOSTNAME: `hostname -f`"
+	echo "NAME: $NAME"
+	echo "DATE: $START_DATE"
+	echo "IP: $IP"
 }
 
-# redirect all to logfile
-exec >>"$LOGFILE" 2>&1
-debug '######################################################################'
-debug "`date`"
-# get start stamp
-START_STAMP="`date '+%Y-%m-%d'`"
-# parse command line
+# main
+main()
+{
+	START_STAMP="`date '+%s'`"
+	START_DATE="`date -d \"@$START_STAMP\" '+%Y-%m-%d %H:%M:%S'`"
+	START_DAY="`date -d \"@$START_STAMP\" '+%Y-%m-%d'`"
+	debug "----------------------------------------------------------------------"
+	debug "DATE: $START_DATE"
+	# read config
+	test -e "$CFGFILE" || die "config file does not exist: '$CFGFILE'"
+	. "$CFGFILE" || die "error in config file: '$CFGFILE'"
+	test x"${NAME:-}" != x || die "NAME missing in '$CFGFILE'"
+	test x"${MAILTO:-}" != x || die "MAILTO missing in '$CFGFILE'"
+	: ${MAIL:=Mail}
+	# get our current IP
+	URL='http://api.hostip.info/get_html.php'
+	debug "fetching '$URL'"
+	OUT="`wget -nv -O- \"$URL\" 2>>\"$LOGFILE\"`" \
+		|| die "could not fetch '$URL'"
+	echo "$OUT" | while read LINE; do debug " > $LINE"; done
+	# extract and check the ip
+	E='s/^[ \t]*[iI][pP][ \t]*:[ \t*]\([0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\)[ \t]*$/\1/;
+       t QUIT; b LOOP; :QUIT; p; q; :LOOP;'
+	IP="`echo \"$OUT\" | sed --posix -n \"$E\"`"
+	test x"$IP" != x || die "IP not found in output"
+	debug "got IP: '$IP'"
+	# check the current state
+	if [ $FORCE -ne 0 ]; then
+		debug "force enabled, sending mail"
+	elif [ -e "$STATEFILE" ]; then
+		STATE="`cat \"$STATEFILE\"`"
+		LAST_DAY="`echo \"$STATE\" | cut -d: -f1`"
+		LAST_IP="`echo \"$STATE\" | cut -d: -f2`"
+		debug "found state: '$LAST_DAY:$IP'"
+		if [ x"$LAST_IP" != x"$IP" ]; then
+			debug "IP has changed, sending mail"
+			logger -tmyip -pinfo "IP has changed: $IP"
+		elif [ x"$LAST_DAY" != x"$START_DAY" ]; then
+			debug "date has changed, sending mail"
+		else
+			debug "IP is up to date, bye"
+			return 0
+		fi
+	else
+		debug "no state file found, sending mail"
+	fi
+	# send notification
+	debug "sending mail to $MAILTO (using $MAIL)"
+	SUBJECT="MYIP_UPDATE - `hostname` - $START_DATE"
+	mail_body | "$MAIL" -s "$SUBJECT" $MAILTO \
+		|| die "$MAIL failed ($?)"
+	# update the statefile
+	echo "$START_DAY:$IP" >"$STATEFILE.tmp"
+	mv -f "$STATEFILE.tmp" "$STATEFILE"
+	# ok
+	debug "all done!"
+}
+
+# parse the command line
+VERBOSE=0
 FORCE=0
-OPTS="`getopt -n $PACKAGE -o 'f' -- ${@}`" || die "getopt failed"
+OPTS="`getopt -n $PACKAGE -o 'vf' -- ${@}`" || die "getopt failed"
 eval set -- "$OPTS"
 while true; do
 	case "$1" in
 		-f) FORCE=1; shift;;
+		-v) VERBOSE=1; shift;;
 		--) shift; break;;
 		*) die "oups: opt '$1'";;
 	esac
 done
-# read and check the config
-debug "config file: '$CFGFILE'"
-test -e "$CFGFILE" || die "config file not found: '$CFGFILE'"
-. "$CFGFILE" || die "error in config file: '$CFGFILE'"
-test x"${MAILTO:-}" != x || die "MAILTO not set in config"
-: ${HOSTIPADDR:=http://api.hostip.info}
-: ${HOSTIPCMD:=get_html.php}
-: ${TITLE:=?}
-# get IP
-debug "getting IP from '${HOSTIPADDR}/${HOSTIPCMD}'"
-OUT="`wget -nv -O- ${HOSTIPADDR}/${HOSTIPCMD}`" \
-  || die "wget failed!"
-echo "$OUT" | while read L; do debug " > $L"; done
-# extract it from output
-E="/^[ \t]*IP[ \t]*:/!d;
-   s,^[ \t]*IP[ \t]*:[ \t]*,,g;
-   s,[ \t]*$,,g;"
-IP=`echo "$OUT" | sed -e "$E"`
-test x"$IP" != x || die "got no IP from ${HOSTIPADDR}"
-info "$START_STAMP: got IP from $HOSTIPADDR: '$IP'"
-# send
-for M in $MAILTO; do
-    debug "MAIL: '$M'"
-	# read the cache file and check last vs new
-    CACHE="$PKGVARDIR/myip.$M.cache"
-    test -e "$CACHE" && CINFO="`cat $CACHE`" || CINFO=':'
-    CSTAMP=`echo "$CINFO" | cut -d: -f1`
-    CIP=`echo "$CINFO" | cut -d: -f2`
-    debug "check stamp/ip: '$CSTAMP/$CIP' <> '$START_STAMP/$IP'"
-    if [ $FORCE -eq 0 -a x"$CSTAMP" = x"$START_STAMP" -a x"$CIP" = x"$IP" ]; then
-        info "$M: up to date ($CSTAMP/$CIP)"
-    else
-        info "$M: needs update ($CSTAMP/$CIP) - sending mail"
-		# send mail
-		SUBJECT="IP UPDATE - $START_STAMP - $TITLE (`hostname -f`)"
-        _mail $START_STAMP $IP $CSTAMP $CIP \
-			| Mail -s "$SUBJECT" "$M" \
-			|| { error "Mail '$M' failed ($?)"; continue; }
-		# update cache
-		echo "$START_STAMP:$IP" >"$CACHE.tmp"
-		mv -f "$CACHE.tmp" "$CACHE"
-	fi
-done
-# ok
-debug "all done!"
+# logging setup
+exec 3>/dev/null
+test $VERBOSE -eq 0 && DEBUGFD=3 || DEBUGFD=2
+ERRORFD=2
+# run
+RMAIN=0
+(   flock -n 9 || die "flock failed";
+	main;
+) 9>>"$LOCKFILE" || RMAIN=$?
+exit $RMAIN
