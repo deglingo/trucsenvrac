@@ -30,6 +30,7 @@
  '(dired-auto-revert-buffer (quote dired-directory-changed-p))
  '(dired-kept-versions 2)
  '(global-auto-revert-mode t)
+ '(indent-tabs-mode nil)
  '(inhibit-startup-screen t)
  '(kept-new-versions 2)
  '(kept-old-versions 0)

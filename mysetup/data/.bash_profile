@@ -9,7 +9,8 @@ export PATH="$HOME/local/bin:$PATH"
 export PKG_CONFIG_PATH="$HOME/local/lib/pkgconfig"
 export LBDIR="$HOME/lb"
 export WINEPREFIX="$HOME/.wine"
-export PYTHONPATH="$HOME/local/lib/python3.3/site-packages"
+export PYTHONPATH="/usr/local/lib/python3.2/site-packages:$HOME/local/lib/python3.2/site-packages"
+export ACLOCAL_PATH="$HOME/local/share/aclocal"
 
 # [temp]
 export GMB_CONFIGDIR='/home/cedric/.gmb'
