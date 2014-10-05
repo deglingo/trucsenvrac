@@ -11,6 +11,9 @@ export LBDIR="$HOME/lb"
 export WINEPREFIX="$HOME/.wine"
 export PYTHONPATH="/usr/local/lib/python3.2/site-packages:$HOME/local/lib/python3.2/site-packages"
 export ACLOCAL_PATH="$HOME/local/share/aclocal"
+#export PIFTEST_DEBUG=1
+export G_DEBUG='gc-friendly'
+export G_SLICE='all'
 
 # [temp]
 export GMB_CONFIGDIR='/home/cedric/.gmb'

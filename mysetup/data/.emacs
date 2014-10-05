@@ -35,6 +35,7 @@
  '(kept-new-versions 2)
  '(kept-old-versions 0)
  '(pc-selection-mode t)
+ '(rst-level-face-base-color "black")
  '(safe-local-variable-values (quote ((encoding . utf-8))))
  '(save-place t nil (saveplace))
  '(savehist-mode t nil (savehist))
