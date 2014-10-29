@@ -2,7 +2,8 @@
 (defalias 'yes-or-no-p 'y-or-n-p)
 
 (global-set-key (kbd "<f1>") 'delete-other-windows)
-(global-set-key (kbd "<f2>") 'split-window)
+(global-set-key (kbd "<f2>") 'split-window-vertically)
+(global-set-key (kbd "<S-f2>") 'split-window-horizontally)
 (global-set-key (kbd "<f4>") 'other-window)
 (global-set-key (kbd "<f5>") 'comment-region)
 (global-set-key (kbd "<S-f5>") 'uncomment-region)
@@ -18,10 +19,10 @@
 (global-set-key (kbd "<f12>") 'electric-buffer-list)
 
 (custom-set-variables
-  ;; custom-set-variables was added by Custom.
-  ;; If you edit it by hand, you could mess it up, so be careful.
-  ;; Your init file should contain only one such instance.
-  ;; If there is more than one, they won't work right.
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
  '(Man-notify-method (quote aggressive))
  '(column-number-mode t)
  '(compilation-ask-about-save nil)
@@ -39,6 +40,7 @@
  '(safe-local-variable-values (quote ((encoding . utf-8))))
  '(save-place t nil (saveplace))
  '(savehist-mode t nil (savehist))
+ '(scroll-error-top-bottom t)
  '(show-paren-mode t)
  '(show-paren-ring-bell-on-mismatch t)
  '(show-paren-style (quote mixed))
@@ -47,10 +49,10 @@
  '(vc-make-backup-files nil)
  '(version-control t))
 (custom-set-faces
-  ;; custom-set-faces was added by Custom.
-  ;; If you edit it by hand, you could mess it up, so be careful.
-  ;; Your init file should contain only one such instance.
-  ;; If there is more than one, they won't work right.
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
  '(default ((t (:inherit nil :stipple nil :background "#000000" :foreground "Wheat" :inverse-video nil :box nil :strike-through nil :overline nil :underline nil :slant normal :weight normal :height 98 :width normal :foundry "unknown" :family "Droid Sans Mono")))))
 
 
